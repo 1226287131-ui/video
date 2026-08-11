@@ -1,0 +1,48 @@
+# video-v1-studio
+
+视频生成工作台。
+
+特点：
+
+- 只展示请求参数、任务状态和返回参数
+- 默认按远程结果链接工作，不把生成视频落到本地服务器磁盘
+- 可直接部署到静态站点或前端服务器
+- 支持图片、音频、视频参考文件临时上传，过期后自动清理
+- 支持 `grok-imagine-1.5-video` 的专用 multipart 创建、轮询和鉴权播放链路
+
+## 开发
+
+```bash
+npm install
+npm run dev
+```
+
+## 构建
+
+```bash
+npm run build
+```
+
+## 部署说明
+
+默认 Base URL 是 `https://api.kkone.vip`，可通过 `VITE_API_BASE_URL` 覆盖。legacy 视频模型使用 `/v1/video/generations`；`grok-imagine-1.5-video`、`video-v2` 系列和 `video-v3` 系列使用 `/v1/videos`、`/v1/videos/{task_id}` 及可用的 `/v1/videos/{task_id}/content`。Grok 创建任务固定使用 multipart 的 `model`、`prompt`、`aspect_ratio`、`seconds`、`resolution` 字段；时长为 1 到 15 秒，画幅支持 `16:9`、`9:16`、`1:1`、`4:3`、`3:4`、`2:3`、`3:2`。图生视频会按上传顺序重复附加真实文件字段 `input_reference`，不会发送旧协议中的 `size`、`quality`、图片 URL 或 `reference_images` JSON 字段。
+
+`MiniMax-H3-933-1440P-GF` 使用 legacy 视频接口 `/v1/video/generations`，但请求体是独立协议：`model`、`prompt`、`seconds`（5-15 的整数）、`size`（`3360x1440`、`2560x1440`、`1920x1440`、`1440x1440`、`1440x1920`、`1440x2560`）、`audio`（布尔值）以及可选的 `images` URL 数组（最多 5 张）。不要发送 v2 的 `duration`、`aspect_ratio`、`resolution` 或 `generate_audio` 字段。
+
+`video-v3`、`seedance-2.5`、`seedance2.5`、`sd-2.5`、`sd2.5` 会按 SD2.5 OpenAI Video 协议使用 `/v1/videos` 创建和查询任务。前端提交 JSON 顶层字段：`model`、`prompt`、`duration`（4-30 的整数）、`ratio`（`auto`、`21:9`、`16:9`、`4:3`、`1:1`、`3:4`、`9:16`）、固定 `resolution: "720p"`、可选的 `images`（最多 30）、`videos`（最多 10）、`audios`（最多 10）、`generate_audio`、`seed`、`bypass_face_check`、`grid_strength`。参考文件会先经项目域名转为临时公网 URL；同类重复 URL 会在提交前去重。
+
+前端只负责提交任务、轮询状态和播放远程视频。Grok 图生视频只接受本地上传的真实图片文件，可分批添加多张，最终按顺序作为重复的 `input_reference` 字段提交；两张及以上参考图时，本站页面仅允许选择 `480p` 或 `720p`，单图和文生视频仍可选择 `1080p`。参考图数量、文件格式和请求体大小以实际渠道返回为准。Grok 的 `/content` 接口需要 Bearer 鉴权，因此视频会临时加载到当前浏览器会话，不会落到本站服务器磁盘。
+真正的视频文件应由上游或对象存储托管，站点只保存链接，不保存 mp4 到你的服务器磁盘。
+
+## 临时图片上传服务
+
+除 Grok 的原生 multipart 图生视频外，图生视频及多媒体参考需要先变成公网 URL，上游才能读取。项目提供了一个无数据库的临时上传服务，所有文件以流式方式写入临时目录：图片（JPG/PNG/WebP）单张最多 20MB，音频（MP3/WAV/M4A/AAC/OGG）单个最多 50MB，视频（MP4/WebM/MOV）单个最多 200MB，每次请求最多 15 个文件。Grok 图片会逐张上传，因此可分批累积多张；20MB 和 JPG/PNG/WebP 是本站临时上传服务限制，不是 Grok 上游的承诺。前端对 `video-v2`、`video-v2-fast` 的参考图放宽到 15MB，其他图片上传入口仍按各自的 12MB 校验；服务端图片总上限保持不低于 15MB。文件默认保留 12 小时，服务每 12 小时扫描并清理一次过期文件；提交成功或失败后不会立即删除，用户可以直接复用参考文件重试。
+
+```bash
+npm run upload-server
+npm run dev
+```
+
+部署到项目域名时，把域名的 `/api/uploads` 和 `/api/video-proxy` 反向代理到上传服务（默认 `127.0.0.1:8787`），并设置 `PUBLIC_BASE_URL=https://你的项目域名`。视频代理只做流式转发，不落盘；不要把 `server/tmp-uploads` 暴露为目录，也不要把临时文件目录加入静态站点根目录。Nginx 的上传上限应至少保留到 `210m`，以容纳单个 200MB 视频及 multipart 开销。
+
+Nginx location 示例见 `deploy/nginx-video-v1.conf`。反代配置生效后，启动 `npm run upload-server`，再部署 `dist` 静态文件。

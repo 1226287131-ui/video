@@ -1,0 +1,30 @@
+[Unit]
+Description=video-v1-studio temporary upload and video proxy service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/www/wwwroot/video.kkone.vip/app
+Environment=NODE_ENV=production
+Environment=PUBLIC_BASE_URL=https://video.kkone.vip
+Environment=UPLOAD_HOST=127.0.0.1
+Environment=UPLOAD_PORT=8787
+Environment=UPLOAD_DIR=/www/data/video-v1-uploads
+Environment=UPLOAD_TTL_MS=43200000
+Environment=CLEANUP_INTERVAL_MS=43200000
+ExecStart=/usr/bin/node server/upload-server.mjs
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/www/data/video-v1-uploads
+
+[Install]
+WantedBy=multi-user.target
