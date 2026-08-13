@@ -63,6 +63,7 @@ import {
   isValidGrokVideoAspectRatio,
   isValidGrokVideoDuration,
   isValidGrokVideoResolutionForReferenceCount,
+  type GrokVideoInputReference,
 } from './videoApi'
 import {
   MINIMAX_H3_MAX_IMAGES,
@@ -113,6 +114,16 @@ type UploadedAsset = {
   name?: string
   kind?: V2MediaKind
   mime_type?: string
+}
+
+function uniqueUploadedAssetsById(assets: readonly UploadedAsset[]) {
+  const ids = new Set<string>()
+  return assets.filter((asset) => {
+    const id = String(asset?.id || '').trim()
+    if (!id || ids.has(id)) return false
+    ids.add(id)
+    return true
+  })
 }
 type TaskStatus =
   | 'draft'
@@ -221,6 +232,7 @@ const UNCERTAIN_SUBMISSIONS_STORAGE_KEY = 'video-v1-studio:uncertain-submissions
 const API_KEY_STORAGE = 'video-v1-studio:api-key'
 const HISTORY_LIMIT = 20
 const MAX_REFERENCE_IMAGES = 9
+const MAX_GROK_REFERENCE_IMAGES = 7
 const MAX_MINIMAX_IMAGES = MINIMAX_H3_MAX_IMAGES
 const MAX_VIDEO_V2_IMAGES = VIDEO_V2_MEDIA_LIMITS.images
 const MAX_VIDEO_V2_AUDIOS = VIDEO_V2_MEDIA_LIMITS.audios
@@ -423,6 +435,7 @@ function App() {
   const [imageUrls, setImageUrls] = useState<string[]>([''])
   const [imageSourceMode, setImageSourceMode] = useState<ImageSourceMode>('upload')
   const [uploadedImages, setUploadedImages] = useState<UploadedAsset[]>([])
+  const [grokReferenceImages, setGrokReferenceImages] = useState<UploadedAsset[]>([])
   const [uploadedAudios, setUploadedAudios] = useState<UploadedAsset[]>([])
   const [uploadedVideos, setUploadedVideos] = useState<UploadedAsset[]>([])
   const [uploadingImages, setUploadingImages] = useState(false)
@@ -449,7 +462,7 @@ function App() {
   const videoV2ModelSelected = isVideoV2Model(form.model)
   const videoResourceModelSelected = videoV2ModelSelected || videoV3ModelSelected
   const videoV2FallbackModelSelected = isVideoV2FallbackModel(form.model)
-  const grokUsesMultipleReferences = grokModelSelected && mode === 'image' && uploadedImages.length > 1
+  const grokUsesMultipleReferences = grokModelSelected && mode === 'image' && uniqueUploadedAssetsById(grokReferenceImages).length > 1
   const videoV2MediaLimits = videoV3ModelSelected ? VIDEO_V3_MEDIA_LIMITS : getVideoV2MediaLimits(form.model)
   const videoV2ImageSizeLimit = getVideoV2ImageSizeLimit(form.model)
   const getVideoV2MediaLimit = (kind: V2MediaKind) => (
@@ -670,7 +683,14 @@ function App() {
   const visibleGrokResolutionPresets = grokUsesMultipleReferences
     ? GROK_MULTI_REFERENCE_VIDEO_RESOLUTIONS
     : videoResolutionPresets
-  const referenceImageLimit = miniMaxModelSelected ? MAX_MINIMAX_IMAGES : MAX_REFERENCE_IMAGES
+  const referenceImageLimit = grokModelSelected
+    ? MAX_GROK_REFERENCE_IMAGES
+    : miniMaxModelSelected
+      ? MAX_MINIMAX_IMAGES
+      : MAX_REFERENCE_IMAGES
+  // Grok requires native multipart image files. Keep its selection isolated so files
+  // uploaded for another model cannot silently become extra input_reference fields.
+  const currentUploadedImages = grokModelSelected ? uniqueUploadedAssetsById(grokReferenceImages) : uploadedImages
   const activeTasks = history.filter((item) => isActiveTaskStatus(item.status))
   const activeReferenceUploadIds = new Set(activeTasks.flatMap((item) => item.reference_upload_ids ?? []))
   const activeMediaUploadIds = new Set(activeTasks.flatMap((item) => [
@@ -689,18 +709,18 @@ function App() {
     }
   }
   const configuredReferenceItems = videoResourceModelSelected
-    ? uploadedImages.slice(0, videoV2MediaLimits.images)
+    ? currentUploadedImages.slice(0, videoV2MediaLimits.images)
         .map((item, index) => ({ key: item.id, number: index + 1, url: item.url }))
     : imageSourceMode === 'upload'
       ? (grokModelSelected || miniMaxModelSelected || imageInputMode === 'multiple'
-        ? uploadedImages.slice(0, referenceImageLimit)
-        : uploadedImages.slice(0, 1))
+        ? currentUploadedImages.slice(0, referenceImageLimit)
+        : currentUploadedImages.slice(0, 1))
         .map((item, index) => ({ key: item.id, number: index + 1, url: item.url }))
       : (imageInputMode === 'multiple' ? imageUrls : imageUrls.slice(0, 1))
         .map((url, index) => ({ key: `url-${index}`, number: index + 1, url: url.trim() }))
   const configuredImageUrls = configuredReferenceItems.map((item) => item.url)
   const legacyReferenceInputPresent = mode === 'image' && (
-    uploadedImages.length > 0 || imageUrls.some((value) => value.trim())
+    currentUploadedImages.length > 0 || imageUrls.some((value) => value.trim())
   )
   const referencePreviewItems = configuredReferenceItems.filter((item) => isHttpUrl(item.url))
   const mentionOptions = activeMention && !grokModelSelected && !miniMaxModelSelected
@@ -801,7 +821,7 @@ function App() {
     }))
     setImageInputMode('multiple')
     setImageSourceMode('upload')
-    setMessage('Grok Imagine 1.5 支持文生和多参考图生视频：参考图会按上传顺序以重复 input_reference 文件字段提交；支持 1 到 15 秒、7 种画幅与 480p/720p/1080p')
+    setMessage('Grok Imagine 1.5 支持文生和最多 7 张参考图生视频：请在当前模型下上传参考图，文件会按上传顺序以重复 input_reference 字段提交；支持 1 到 15 秒、7 种画幅与 480p/720p/1080p')
   }
 
   function updateActiveMention(value: string, cursor: number | null) {
@@ -1224,12 +1244,11 @@ function App() {
       setMessage(`${oversizedFile.name} 超过 ${maxReferenceFileMb}MB，请压缩后重新上传`)
       return
     }
+    const targetImages = grokModelSelected ? grokReferenceImages : uploadedImages
     const appendImages = grokModelSelected || miniMaxModelSelected || imageInputMode === 'multiple'
-    const availableSlots = grokModelSelected
-      ? Number.POSITIVE_INFINITY
-      : appendImages
-        ? referenceImageLimit - uploadedImages.length
-        : 1
+    const availableSlots = appendImages
+      ? referenceImageLimit - uniqueUploadedAssetsById(targetImages).length
+      : 1
     if (availableSlots <= 0) {
       setMessage(`最多上传 ${referenceImageLimit} 张参考图，请先移除一张`)
       return
@@ -1241,13 +1260,15 @@ function App() {
     uploadInFlightRef.current = true
     setUploadingImages(true)
     setMessage('正在上传临时参考图...')
-    const previous = uploadedImages
+    const previous = targetImages
     const uploaded: UploadedAsset[] = []
     const appendUploadedImages = () => {
       if (uploaded.length === 0) return
-      setUploadedImages((current) => grokModelSelected
-        ? [...current, ...uploaded]
-        : [...current, ...uploaded].slice(0, referenceImageLimit))
+      if (grokModelSelected) {
+        setGrokReferenceImages((current) => uniqueUploadedAssetsById([...current, ...uploaded]).slice(0, referenceImageLimit))
+        return
+      }
+      setUploadedImages((current) => uniqueUploadedAssetsById([...current, ...uploaded]).slice(0, referenceImageLimit))
     }
     try {
       for (const [index, file] of limited.entries()) {
@@ -1493,14 +1514,16 @@ function App() {
       setMessage('这张参考图仍被生成中的任务使用，任务结束后才能删除')
       return
     }
-    const referenceNumber = uploadedImages.findIndex((item) => item.id === image.id) + 1
+    const imageAssets = grokModelSelected ? grokReferenceImages : uploadedImages
+    const referenceNumber = imageAssets.findIndex((item) => item.id === image.id) + 1
     if (referenceNumber < 1) return
     if (!grokModelSelected && !miniMaxModelSelected && getReferenceMentionNumbers(form.prompt).includes(referenceNumber)) {
       setMessage(`Prompt 正在使用 @参考图${referenceNumber}，请先删除该引用再移除图片`)
       promptRef.current?.focus()
       return
     }
-    setUploadedImages((current) => current.filter((item) => item.id !== image.id))
+    if (grokModelSelected) setGrokReferenceImages((current) => current.filter((item) => item.id !== image.id))
+    else setUploadedImages((current) => current.filter((item) => item.id !== image.id))
     if (!grokModelSelected && !miniMaxModelSelected) updateField('prompt', reindexReferenceMentionsAfterRemoval(form.prompt, referenceNumber))
     await cleanupUploadedAssets([image])
     setMessage(`已移除参考图${referenceNumber}，后续参考图编号已自动更新`)
@@ -1593,14 +1616,14 @@ function App() {
       : historyUsesMiniMax
         ? MAX_MINIMAX_IMAGES
       : historyUsesGrok
-        ? Number.POSITIVE_INFINITY
+        ? MAX_GROK_REFERENCE_IMAGES
         : MAX_REFERENCE_IMAGES
     if (expectedReferenceCount > imageLimit || expectedAudioCount > historyVideoV2Limits.audios || expectedVideoCount > historyVideoV2Limits.videos) {
       setMessage('这条历史任务的参考素材数量超过当前模型限制，无法直接复用')
       return
     }
     const expectedMediaCount = expectedReferenceCount + expectedAudioCount + expectedVideoCount
-    const draftHasMedia = uploadedImages.length > 0 || uploadedAudios.length > 0 || uploadedVideos.length > 0 || imageUrls.some((value) => value.trim())
+    const draftHasMedia = uploadedImages.length > 0 || grokReferenceImages.length > 0 || uploadedAudios.length > 0 || uploadedVideos.length > 0 || imageUrls.some((value) => value.trim())
     if (expectedMediaCount > 0 && draftHasMedia) {
       setMessage('当前草稿已有参考素材，为避免错绑，请先清空后再复用历史 Prompt')
       return
@@ -1971,7 +1994,7 @@ function App() {
       ? uploadedImages.slice(0, videoV2SubmissionLimits.images)
       : []
     const grokUploadedImages = useGrokApi && submissionMode === 'image'
-      ? [...uploadedImages]
+      ? uniqueUploadedAssetsById(grokReferenceImages)
       : []
     const videoV2Audios = useVideoResourceApi && submissionMode === 'image'
       ? uploadedAudios.slice(0, videoV2SubmissionLimits.audios)
@@ -2023,6 +2046,10 @@ function App() {
           ? 'grok-imagine-1.5-video 使用多参考图时仅支持 480p 或 720p 分辨率'
           : 'grok-imagine-1.5-video 仅支持 480p、720p 或 1080p 分辨率')
         setShowSettings(true)
+        return
+      }
+      if (grokUploadedImages.length > MAX_GROK_REFERENCE_IMAGES) {
+        setMessage(`grok-imagine-1.5-video 最多支持 ${MAX_GROK_REFERENCE_IMAGES} 张参考图，请移除多余图片`)
         return
       }
     }
@@ -2124,28 +2151,32 @@ function App() {
       return
     }
 
-    let grokReferences: Array<{ blob: Blob; fileName: string }> = []
-    if (useGrokApi && submissionMode === 'image') {
-      if (grokUploadedImages.length === 0) {
-        setMessage('请先上传至少一张 Grok 参考图')
-        return
+    // Lock before any asynchronous file reads so a second click cannot schedule a duplicate batch.
+    submissionInFlightRef.current = true
+    setSubmitting(true)
+    try {
+      let grokReferences: GrokVideoInputReference[] = []
+      if (useGrokApi && submissionMode === 'image') {
+        if (grokUploadedImages.length === 0) {
+          setMessage('请先上传至少一张 Grok 参考图')
+          return
+        }
+        try {
+          grokReferences = await Promise.all(grokUploadedImages.map(async (uploadedReference, index) => {
+            const response = await fetch(`/api/uploads/${encodeURIComponent(uploadedReference.id)}`)
+            if (!response.ok) throw new Error(`第 ${index + 1} 张参考图读取失败: HTTP ${response.status}`)
+            const blob = await response.blob()
+            if (!blob.size) throw new Error(`第 ${index + 1} 张参考图文件为空`)
+            if (blob.size > MAX_GROK_REFERENCE_FILE_BYTES) throw new Error(`第 ${index + 1} 张参考图超过 ${MAX_GROK_REFERENCE_FILE_MB}MB`)
+            return { id: uploadedReference.id, blob, fileName: uploadedReference.id }
+          }))
+        } catch (error: any) {
+          setMessage(`读取 Grok 参考图失败：${error?.message || '请重新上传图片'}`)
+          return
+        }
       }
-      try {
-        grokReferences = await Promise.all(grokUploadedImages.map(async (uploadedReference, index) => {
-          const response = await fetch(`/api/uploads/${encodeURIComponent(uploadedReference.id)}`)
-          if (!response.ok) throw new Error(`第 ${index + 1} 张参考图读取失败: HTTP ${response.status}`)
-          const blob = await response.blob()
-          if (!blob.size) throw new Error(`第 ${index + 1} 张参考图文件为空`)
-          if (blob.size > MAX_GROK_REFERENCE_FILE_BYTES) throw new Error(`第 ${index + 1} 张参考图超过 ${MAX_GROK_REFERENCE_FILE_MB}MB`)
-          return { blob, fileName: uploadedReference.id }
-        }))
-      } catch (error: any) {
-        setMessage(`读取 Grok 参考图失败：${error?.message || '请重新上传图片'}`)
-        return
-      }
-    }
 
-    const payload = useGrokApi
+      const payload = useGrokApi
       ? { model: formSnapshot.model, prompt: submittedPrompt }
       : useMiniMaxApi
         ? buildMiniMaxH3SubmitPayload({
@@ -2189,22 +2220,19 @@ function App() {
           submissionInputMode,
           referenceUrls,
           )
-    const createToken = () => typeof window.crypto?.randomUUID === 'function'
-      ? window.crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const batchId = `batch_${createToken()}`
-    const batchCreatedAt = Date.now() / 1000
-    const plans = createBatchPlans(
-      requestedCount,
-      payload,
-      (index) => `${batchId}_${index + 1}_${createToken()}`,
-    )
+      const createToken = () => typeof window.crypto?.randomUUID === 'function'
+        ? window.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const batchId = `batch_${createToken()}`
+      const batchCreatedAt = Date.now() / 1000
+      const plans = createBatchPlans(
+        requestedCount,
+        payload,
+        (index) => `${batchId}_${index + 1}_${createToken()}`,
+      )
 
-    submissionInFlightRef.current = true
-    setSubmitting(true)
-    setMessage(`正在并发调度 ${requestedCount} 个任务...`)
+      setMessage(`正在并发调度 ${requestedCount} 个任务...`)
 
-    try {
       const results = await runWithConcurrency(plans, MAX_POST_CONCURRENCY, async (plan) => {
         let res: Response
         try {
@@ -2899,13 +2927,13 @@ function App() {
                           <span>{grokModelSelected || miniMaxModelSelected ? `支持分批添加，最多 ${referenceImageLimit} 张` : imageInputMode === 'multiple' ? `支持分批添加，最多 ${referenceImageLimit} 张` : '单图模式会替换当前图片'}</span>
                         </span>
                         <span className="image-dropzone-count">
-                          {grokModelSelected || miniMaxModelSelected ? `${uploadedImages.length}/${referenceImageLimit}` : imageInputMode === 'multiple' ? `${uploadedImages.length}/${referenceImageLimit}` : uploadedImages.length > 0 ? '1/1' : '0/1'}
+                          {grokModelSelected || miniMaxModelSelected ? `${currentUploadedImages.length}/${referenceImageLimit}` : imageInputMode === 'multiple' ? `${currentUploadedImages.length}/${referenceImageLimit}` : currentUploadedImages.length > 0 ? '1/1' : '0/1'}
                         </span>
                       </label>
                       <div className="field-hint" id="reference-image-upload-hint">图片会暂存到项目域名下并保留 12 小时；本站单张最大 {grokModelSelected ? MAX_GROK_REFERENCE_FILE_MB : MAX_REFERENCE_FILE_MB}MB。</div>
-                      {uploadedImages.length > 0 && (
+                      {currentUploadedImages.length > 0 && (
                         <div className="uploaded-image-list">
-                          {uploadedImages.map((item, index) => (
+                          {currentUploadedImages.map((item, index) => (
                             <span className="uploaded-image-name" key={item.id} title={item.id}>
                               <span>{index + 1}. {item.id}</span>
                               <button

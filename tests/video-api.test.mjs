@@ -82,10 +82,32 @@ test('builds a fresh multipart form with exactly the documented Grok fields', ()
   assert.equal(first.get('aspect_ratio'), '3:2')
   assert.equal(first.get('seconds'), '8')
   assert.equal(first.get('resolution'), '1080p')
-  assert.deepEqual(first.getAll('input_reference').map((file) => file.name), ['reference.png'])
+  const inputReferences = first.getAll('input_reference')
+  assert.equal(inputReferences.length, 1)
+  assert.equal(inputReferences[0].name, 'reference.png')
+  assert.equal(inputReferences[0].type, 'image/png')
+  assert.equal(inputReferences[0].size, reference.blob.size)
   for (const unsupportedField of ['duration', 'ratio', 'async', 'image', 'images', 'size', 'quality']) {
     assert.equal(first.has(unsupportedField), false)
   }
+})
+
+test('keeps a single JPEG reference as one JPEG multipart file', () => {
+  const reference = { id: 'upload-jpeg', blob: new Blob(['jpeg-image'], { type: 'image/jpeg' }), fileName: 'reference.jpg' }
+  const form = createGrokVideoFormData({
+    model: 'grok-imagine-1.5-video',
+    prompt: 'camera moves forward',
+    ratio: '16:9',
+    seconds: 8,
+    resolution: '720p',
+    inputReferences: [reference],
+  })
+
+  const inputReferences = form.getAll('input_reference')
+  assert.equal(inputReferences.length, 1)
+  assert.equal(inputReferences[0].name, 'reference.jpg')
+  assert.equal(inputReferences[0].type, 'image/jpeg')
+  assert.equal(inputReferences[0].size, reference.blob.size)
 })
 
 test('appends every non-empty Grok reference file in upload order', () => {
@@ -114,6 +136,22 @@ test('appends every non-empty Grok reference file in upload order', () => {
     resolution: '720p',
     inputReferences: [{ blob: new Blob([], { type: 'image/png' }), fileName: 'empty.png' }],
   }), /有效参考图文件/)
+})
+
+test('deduplicates Grok references with the same temporary upload id', () => {
+  const first = { id: 'upload-first', blob: new Blob(['first'], { type: 'image/png' }), fileName: 'first.png' }
+  const duplicateFirst = { id: 'upload-first', blob: new Blob(['duplicate'], { type: 'image/png' }), fileName: 'duplicate.png' }
+  const second = { id: 'upload-second', blob: new Blob(['second'], { type: 'image/png' }), fileName: 'second.png' }
+  const form = createGrokVideoFormData({
+    model: 'grok-imagine-1.5-video',
+    prompt: 'two reference images appear once each',
+    ratio: '16:9',
+    seconds: 10,
+    resolution: '720p',
+    inputReferences: [first, duplicateFirst, second],
+  })
+
+  assert.deepEqual(form.getAll('input_reference').map((file) => file.name), ['first.png', 'second.png'])
 })
 
 test('rejects 1080p when Grok submits multiple reference files', () => {

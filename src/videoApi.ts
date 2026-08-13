@@ -78,6 +78,8 @@ export function isValidGrokVideoResolutionForReferenceCount(
 }
 
 export type GrokVideoInputReference = {
+  /** Stable upload identifier used only to prevent the same temporary asset being appended twice. */
+  id?: string
   blob: Blob
   fileName?: string
 }
@@ -103,13 +105,23 @@ export function createGrokVideoFormData(input: GrokVideoFormDataInput) {
     throw new Error('grok-imagine-1.5-video 不支持该画幅')
   }
   const inputReferences = input.inputReferences ?? []
+  const uniqueInputReferences: GrokVideoInputReference[] = []
+  const inputReferenceIds = new Set<string>()
+  for (const reference of inputReferences) {
+    const referenceId = typeof reference?.id === 'string' ? reference.id.trim() : ''
+    if (referenceId) {
+      if (inputReferenceIds.has(referenceId)) continue
+      inputReferenceIds.add(referenceId)
+    }
+    uniqueInputReferences.push(reference)
+  }
   if (!isValidGrokVideoResolution(input.resolution)) {
     throw new Error('grok-imagine-1.5-video 仅支持 480p、720p 或 1080p')
   }
-  if (!isValidGrokVideoResolutionForReferenceCount(input.resolution, inputReferences.length)) {
+  if (!isValidGrokVideoResolutionForReferenceCount(input.resolution, uniqueInputReferences.length)) {
     throw new Error('grok-imagine-1.5-video 使用多参考图时仅支持 480p 或 720p')
   }
-  for (const reference of inputReferences) {
+  for (const reference of uniqueInputReferences) {
     if (!(reference?.blob instanceof Blob) || reference.blob.size === 0) {
       throw new Error('grok-imagine-1.5-video 必须提供有效参考图文件')
     }
@@ -121,7 +133,7 @@ export function createGrokVideoFormData(input: GrokVideoFormDataInput) {
   formData.append('aspect_ratio', input.ratio)
   formData.append('seconds', String(input.seconds))
   formData.append('resolution', input.resolution)
-  inputReferences.forEach((reference, index) => {
+  uniqueInputReferences.forEach((reference, index) => {
     formData.append('input_reference', reference.blob, reference.fileName || `reference-${index + 1}.png`)
   })
   return formData
