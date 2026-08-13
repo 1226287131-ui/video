@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   Copy,
   Film,
@@ -98,6 +98,7 @@ import {
   MAX_PROMPT_FILE_BYTES,
   mergeImportedPrompt,
 } from './promptFileImport'
+import { getReplacementModelId } from './modelSelection'
 
 type VideoDuration = number
 type VideoRatio = 'auto' | '21:9' | '16:9' | '9:16' | '1:1' | '4:3' | '3:4' | '2:3' | '3:2'
@@ -275,7 +276,7 @@ const initialForm: FormState = {
   seed: '',
   bypassFaceCheck: false,
   gridStrength: '',
-  model: 'video-v1' // 默认回退模型
+  model: 'video-v1' // 模型列表加载前的临时值；加载后会自动校验。
 }
 
 const statusLabel: Record<string, string> = {
@@ -567,7 +568,7 @@ function App() {
         const targetModels = videoModels.length > 0 ? videoModels : items
         
         setModels(targetModels)
-        setMessage(`成功加载可用模型 (共 ${targetModels.length} 个)，当前固定使用 ${initialForm.model}`)
+        setMessage(`成功加载可用模型（共 ${targetModels.length} 个）`)
       }
     } catch (err) {
       console.error('获取模型失败:', err)
@@ -739,7 +740,7 @@ function App() {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
-  function changeModel(nextModel: string) {
+  const changeModel = useCallback((nextModel: string) => {
     if (isMiniMaxH3VideoModel(nextModel)) {
       setForm((current) => ({
         ...current,
@@ -822,7 +823,15 @@ function App() {
     setImageInputMode('multiple')
     setImageSourceMode('upload')
     setMessage('Grok Imagine 1.5 支持文生和最多 7 张参考图生视频：请在当前模型下上传参考图，文件会按上传顺序以重复 input_reference 字段提交；支持 1 到 15 秒、7 种画幅与 480p/720p/1080p')
-  }
+  }, [])
+
+  // The native select visually falls back to its first option when its controlled
+  // value disappears. Synchronize React state before paint so the configuration
+  // and request protocol always match that visible first model.
+  useLayoutEffect(() => {
+    const replacementModel = getReplacementModelId(form.model, models)
+    if (replacementModel) changeModel(replacementModel)
+  }, [changeModel, form.model, models])
 
   function updateActiveMention(value: string, cursor: number | null) {
     const nextMention = findActiveReferenceMention(value, cursor ?? value.length)
