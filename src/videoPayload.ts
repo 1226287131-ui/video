@@ -61,6 +61,28 @@ export type VideoV3SubmitPayloadInput = {
   gridStrength?: number | ''
 }
 
+export type VideoV3ContentItem =
+  | { type: 'text', text: string }
+  | { type: 'image_url', image_url: { url: string } }
+  | { type: 'video_url', video_url: { url: string } }
+  | { type: 'audio_url', audio_url: { url: string } }
+
+type VideoV3PayloadBase = {
+  model: string
+  duration: number
+  ratio: VideoV3Ratio
+  resolution: typeof VIDEO_V3_RESOLUTION
+  generate_audio: boolean
+  seed?: number
+  bypass_face_check?: boolean
+  grid_strength?: number
+}
+
+export type VideoV3SubmitPayload = VideoV3PayloadBase & (
+  | { prompt: string, images?: string[] }
+  | { content: VideoV3ContentItem[] }
+)
+
 function normalizeUrls(urls: readonly string[], label: string, limit: number) {
   const normalized = urls.map((url) => {
     if (typeof url !== 'string' || !url.trim()) throw new Error(`SD2.5 的 ${label} 必须是非空 URL`)
@@ -71,7 +93,7 @@ function normalizeUrls(urls: readonly string[], label: string, limit: number) {
   return unique
 }
 
-/** Build the top-level JSON protocol documented for video-v3 / SD2.5. */
+/** Build the documented SD2.5 JSON protocol for video-v3. */
 export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
   if (!isVideoV3Model(input.model)) throw new Error('SD2.5 视频表单只能用于 video-v3 系列模型')
   if (!input.prompt.trim()) throw new Error('Prompt 不能为空')
@@ -93,33 +115,31 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
     throw new Error('video-v3 的 grid_strength 必须在 0 到 1 之间')
   }
 
-  const payload: {
-    model: string
-    prompt: string
-    duration: number
-    ratio: VideoV3Ratio
-    resolution: typeof VIDEO_V3_RESOLUTION
-    images?: string[]
-    videos?: string[]
-    audios?: string[]
-    generate_audio: boolean
-    seed?: number
-    bypass_face_check?: boolean
-    grid_strength?: number
-  } = {
+  const payloadBase: VideoV3PayloadBase = {
     model: input.model.trim(),
-    prompt: input.prompt,
     duration: input.duration,
     ratio: input.ratio,
     resolution: VIDEO_V3_RESOLUTION,
     generate_audio: input.generateAudio,
   }
+  if (input.seed !== undefined && input.seed !== '') payloadBase.seed = input.seed
+  if (input.bypassFaceCheck !== undefined) payloadBase.bypass_face_check = input.bypassFaceCheck
+  if (input.gridStrength !== undefined && input.gridStrength !== '') payloadBase.grid_strength = input.gridStrength
+
+  // The SD2.5 contract documents audio and video references through content[].
+  // Keep all references in that array when either media type is present.
+  if (videos.length > 0 || audios.length > 0) {
+    const content: VideoV3ContentItem[] = [
+      { type: 'text', text: input.prompt },
+      ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+      ...videos.map((url) => ({ type: 'video_url' as const, video_url: { url } })),
+      ...audios.map((url) => ({ type: 'audio_url' as const, audio_url: { url } })),
+    ]
+    return { ...payloadBase, content }
+  }
+
+  const payload: VideoV3SubmitPayload = { ...payloadBase, prompt: input.prompt }
   if (images.length > 0) payload.images = images
-  if (videos.length > 0) payload.videos = videos
-  if (audios.length > 0) payload.audios = audios
-  if (input.seed !== undefined && input.seed !== '') payload.seed = input.seed
-  if (input.bypassFaceCheck !== undefined) payload.bypass_face_check = input.bypassFaceCheck
-  if (input.gridStrength !== undefined && input.gridStrength !== '') payload.grid_strength = input.gridStrength
   return payload
 }
 

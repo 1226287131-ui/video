@@ -39,15 +39,15 @@ test('validates the documented SD2.5 durations, ratios, and optional grid streng
   for (const strength of [-0.01, 1.01, Number.NaN]) assert.equal(isValidVideoV3GridStrength(strength), false)
 })
 
-test('builds the documented video-v3 JSON fields with fixed 720p and deduplicated media URLs', () => {
+test('uses documented top-level prompt and images for image-only video-v3 requests', () => {
   const payload = buildVideoV3SubmitPayload({
     model: 'video-v3',
-    prompt: '让人物保持参考图外观，并参考视频运镜与环境声音。',
+    prompt: '让人物保持参考图外观。',
     duration: 10,
     ratio: '16:9',
     images: ['https://cdn.example.com/person.png', 'https://cdn.example.com/person.png'],
-    videos: ['https://cdn.example.com/camera.mp4'],
-    audios: ['https://cdn.example.com/ambient.mp3', 'https://cdn.example.com/ambient.mp3'],
+    videos: [],
+    audios: [],
     generateAudio: true,
     seed: 12345,
     bypassFaceCheck: false,
@@ -58,14 +58,41 @@ test('builds the documented video-v3 JSON fields with fixed 720p and deduplicate
   assert.equal(payload.duration, 10)
   assert.equal(payload.ratio, '16:9')
   assert.equal(payload.resolution, VIDEO_V3_RESOLUTION)
+  assert.equal(payload.prompt, '让人物保持参考图外观。')
   assert.deepEqual(payload.images, ['https://cdn.example.com/person.png'])
-  assert.deepEqual(payload.videos, ['https://cdn.example.com/camera.mp4'])
-  assert.deepEqual(payload.audios, ['https://cdn.example.com/ambient.mp3'])
   assert.equal(payload.generate_audio, true)
   assert.equal(payload.seed, 12345)
   assert.equal(payload.bypass_face_check, false)
   assert.equal(payload.grid_strength, 0.6)
-  for (const unsupportedField of ['seconds', 'aspect_ratio', 'quality', 'size', 'async', 'content', 'input_reference']) {
+  for (const unsupportedField of ['seconds', 'aspect_ratio', 'quality', 'size', 'async', 'content', 'input_reference', 'videos', 'audios']) {
+    assert.equal(unsupportedField in payload, false)
+  }
+})
+
+test('uses documented content audio_url and video_url items for multimedia video-v3 requests', () => {
+  const payload = buildVideoV3SubmitPayload({
+    model: 'seedance2.5',
+    prompt: '保持人物形象，并使用参考运镜和环境声音。',
+    duration: 12,
+    ratio: '9:16',
+    images: ['https://cdn.example.com/person.png', 'https://cdn.example.com/person.png'],
+    videos: ['https://cdn.example.com/camera.mp4'],
+    audios: ['https://cdn.example.com/ambient.mp3', 'https://cdn.example.com/ambient.mp3'],
+    generateAudio: false,
+  })
+
+  assert.equal(payload.model, 'seedance2.5')
+  assert.equal(payload.duration, 12)
+  assert.equal(payload.ratio, '9:16')
+  assert.equal(payload.resolution, VIDEO_V3_RESOLUTION)
+  assert.equal(payload.generate_audio, false)
+  assert.deepEqual(payload.content, [
+    { type: 'text', text: '保持人物形象，并使用参考运镜和环境声音。' },
+    { type: 'image_url', image_url: { url: 'https://cdn.example.com/person.png' } },
+    { type: 'video_url', video_url: { url: 'https://cdn.example.com/camera.mp4' } },
+    { type: 'audio_url', audio_url: { url: 'https://cdn.example.com/ambient.mp3' } },
+  ])
+  for (const unsupportedField of ['prompt', 'images', 'videos', 'audios', 'input_reference']) {
     assert.equal(unsupportedField in payload, false)
   }
 })
@@ -85,6 +112,7 @@ test('omits optional SD2.5 media and passthrough fields when they were not chose
   assert.equal('images' in payload, false)
   assert.equal('videos' in payload, false)
   assert.equal('audios' in payload, false)
+  assert.equal('content' in payload, false)
   assert.equal('seed' in payload, false)
   assert.equal('grid_strength' in payload, false)
   assert.equal('bypass_face_check' in payload, false)
@@ -107,6 +135,10 @@ test('rejects invalid SD2.5 values and media limits before a request is sent', (
     ...shared,
     images: Array.from({ length: VIDEO_V3_MEDIA_LIMITS.images + 1 }, (_, index) => `https://example.com/${index}.jpg`),
   }), /最多支持 30/)
+  assert.throws(() => buildVideoV3SubmitPayload({
+    ...shared,
+    audios: Array.from({ length: VIDEO_V3_MEDIA_LIMITS.audios + 1 }, (_, index) => `https://example.com/${index}.mp3`),
+  }), /最多支持 10/)
   assert.throws(() => buildVideoV3SubmitPayload({ ...shared, videos: [''] }), /非空 URL/)
   assert.throws(() => buildVideoV3SubmitPayload({ ...shared, gridStrength: 1.1 }), /0 到 1/)
 })

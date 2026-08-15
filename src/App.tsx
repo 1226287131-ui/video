@@ -2835,7 +2835,7 @@ function App() {
                 </div>
                 <div className="field-hint">
                   {videoV3ModelSelected
-                    ? 'SD2.5 以 images、videos、audios 外链数组提交；图片最多 30 张，视频和音频各最多 10 个。同一类重复外链会自动去重。'
+                    ? 'SD2.5 仅有图片时以 images 外链数组提交；存在参考视频或音频时，会按文档改用 content[] 中的 image_url、video_url、audio_url。图片最多 30 张，视频和音频各最多 10 个。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
                 </div>
               </div>

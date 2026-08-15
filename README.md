@@ -29,7 +29,7 @@ npm run build
 
 `MiniMax-H3-933-1440P-GF` 使用 legacy 视频接口 `/v1/video/generations`，但请求体是独立协议：`model`、`prompt`、`seconds`（5-15 的整数）、`size`（`3360x1440`、`2560x1440`、`1920x1440`、`1440x1440`、`1440x1920`、`1440x2560`）、`audio`（布尔值）以及可选的 `images` URL 数组（最多 5 张）。不要发送 v2 的 `duration`、`aspect_ratio`、`resolution` 或 `generate_audio` 字段。
 
-`video-v3`、`seedance-2.5`、`seedance2.5`、`sd-2.5`、`sd2.5` 会按 SD2.5 OpenAI Video 协议使用 `/v1/videos` 创建和查询任务。前端提交 JSON 顶层字段：`model`、`prompt`、`duration`（4-30 的整数）、`ratio`（`auto`、`21:9`、`16:9`、`4:3`、`1:1`、`3:4`、`9:16`）、固定 `resolution: "720p"`、可选的 `images`（最多 30）、`videos`（最多 10）、`audios`（最多 10）、`generate_audio`、`seed`、`bypass_face_check`、`grid_strength`。参考文件会先经项目域名转为临时公网 URL；同类重复 URL 会在提交前去重。
+`video-v3`、`seedance-2.5`、`seedance2.5`、`sd-2.5`、`sd2.5` 会按 SD2.5 OpenAI Video 协议使用 `/v1/videos` 创建和查询任务。纯文生和仅参考图片时，前端提交顶层 `prompt`、`images`（最多 30）、`duration`（4-30 的整数）、`ratio`（`auto`、`21:9`、`16:9`、`4:3`、`1:1`、`3:4`、`9:16`）、固定 `resolution: "720p"`、`generate_audio`、`seed`、`bypass_face_check`、`grid_strength`。只要存在参考视频（最多 10）或参考音频（最多 10），前端会改为文档规定的 `content` 数组：一个 `text` 项，以及对应的 `image_url`、`video_url`、`audio_url` 项；此时不混发顶层 `prompt`、`images`、`videos` 或 `audios`。参考文件会先经项目域名转为临时公网 URL；同类重复 URL 会在提交前去重。
 
 前端只负责提交任务、轮询状态和播放远程视频。Grok 图生视频只接受本地上传的真实图片文件，最多 7 张；只有在当前 Grok 模型下上传的文件会进入其 `input_reference` 字段，其他模型残留的素材不会被带入。同一个临时上传 ID 即使意外出现在素材列表多次，也只会进入请求体一次。两张及以上参考图时，本站页面仅允许选择 `480p` 或 `720p`，单图和文生视频仍可选择 `1080p`。参考图数量、文件格式和请求体大小以实际渠道返回为准。Grok 的 `/content` 接口需要 Bearer 鉴权，因此视频会临时加载到当前浏览器会话，不会落到本站服务器磁盘。
 真正的视频文件应由上游或对象存储托管，站点只保存链接，不保存 mp4 到你的服务器磁盘。
