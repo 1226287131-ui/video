@@ -32,10 +32,11 @@ test('routes grok and legacy models to their own endpoints', () => {
   assert.equal(getVideoContentPath('video-v1', 'task/a'), '')
 })
 
-test('routes MiniMax-H3 through the legacy video generations endpoint', () => {
-  assert.equal(getVideoSubmitPath('MiniMax-H3-933-1440P-GF'), '/v1/video/generations')
-  assert.equal(getVideoTaskPath('MiniMax-H3-933-1440P-GF', 'task/a'), '/v1/video/generations/task%2Fa')
-  assert.equal(getVideoContentPath('MiniMax-H3-933-1440P-GF', 'task/a'), '')
+test('routes MiniMax-H3 through the /v1/videos resource endpoint', () => {
+  assert.equal(getVideoSubmitPath('MiniMax-H3-933-1440P-GF'), '/v1/videos')
+  assert.equal(getVideoTaskPath('MiniMax-H3-933-1440P-GF', 'task/a'), '/v1/videos/task%2Fa')
+  assert.equal(getVideoContentPath('MiniMax-H3-933-1440P-GF', 'task/a'), '/v1/videos/task%2Fa/content')
+  assert.equal(getVideoSubmitPath('minimax_h3'), '/v1/videos')
 })
 
 test('validates Grok durations, aspect ratios, and resolutions from the current contract', () => {

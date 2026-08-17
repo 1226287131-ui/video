@@ -66,12 +66,21 @@ import {
   type GrokVideoInputReference,
 } from './videoApi'
 import {
+  getMiniMaxH3VideoSizesForAspectRatio,
+  isValidMiniMaxH3AspectRatio,
+  MINIMAX_H3_MAX_AUDIOS,
   MINIMAX_H3_MAX_IMAGES,
+  MINIMAX_H3_MAX_VIDEOS,
+  MINIMAX_H3_MAX_VIDEO_AUDIOS,
   MINIMAX_H3_MAX_SECONDS,
   MINIMAX_H3_MIN_SECONDS,
-  MINIMAX_H3_VIDEO_SIZES,
+  MINIMAX_H3_ASPECT_RATIOS,
+  MINIMAX_H3_DEFAULT_ASPECT_RATIO,
+  MINIMAX_H3_DEFAULT_SIZE,
+  MINIMAX_H3_DEFAULT_SECONDS,
   isValidMiniMaxH3VideoSeconds,
   isValidMiniMaxH3VideoSize,
+  type MiniMaxH3AspectRatio,
   type MiniMaxH3VideoSize,
 } from './minimaxH3'
 import {
@@ -108,7 +117,7 @@ type VideoSize = MiniMaxH3VideoSize
 type VideoMode = 'text' | 'image'
 type ImageInputMode = 'single' | 'multiple'
 type ImageSourceMode = 'url' | 'upload'
-type V2MediaKind = 'image' | 'audio' | 'video'
+type V2MediaKind = 'image' | 'audio' | 'video' | 'video-audio'
 type UploadedAsset = {
   id: string
   url: string
@@ -152,6 +161,10 @@ type TaskRecord = {
   seconds?: number
   size?: VideoSize
   audio?: boolean
+  prompt_enhance?: boolean
+  clarity?: string
+  megapixels?: number
+  metadata_multiple?: number
   seed?: number
   bypass_face_check?: boolean
   grid_strength?: number
@@ -159,9 +172,11 @@ type TaskRecord = {
   submitted_prompt?: string
   reference_count?: number
   reference_audio_count?: number
+  reference_video_audio_count?: number
   reference_video_count?: number
   reference_upload_ids?: string[]
   reference_audio_upload_ids?: string[]
+  reference_video_audio_upload_ids?: string[]
   reference_video_upload_ids?: string[]
   video_mode?: VideoMode
   image_input_mode?: ImageInputMode
@@ -257,6 +272,9 @@ const VIDEO_V2_15MB_IMAGE_MODELS = new Set(['video-v2', 'video-v2-fast'])
 
 function getVideoV2ImageSizeLimit(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
+  if (isMiniMaxH3VideoModel(normalizedModel)) {
+    return { maxMegabytes: MAX_VIDEO_V3_IMAGE_MB, maxBytes: MAX_VIDEO_V3_IMAGE_BYTES }
+  }
   if (isVideoV3Model(normalizedModel)) {
     return { maxMegabytes: MAX_VIDEO_V3_IMAGE_MB, maxBytes: MAX_VIDEO_V3_IMAGE_BYTES }
   }
@@ -267,11 +285,11 @@ function getVideoV2ImageSizeLimit(model: unknown) {
 
 const initialForm: FormState = {
   prompt: '',
-  duration: 5,
+  duration: MINIMAX_H3_DEFAULT_SECONDS,
   ratio: '16:9',
   quality: 'hd',
   resolution: '480p',
-  size: '2560x1440',
+  size: MINIMAX_H3_DEFAULT_SIZE,
   generateAudio: true,
   seed: '',
   bypassFaceCheck: false,
@@ -294,10 +312,7 @@ const statusLabel: Record<string, string> = {
 
 const durationPresets: VideoDuration[] = [5, 10, 15]
 const grokDurationPresets: VideoDuration[] = Array.from({ length: 15 }, (_, index) => index + 1)
-const miniMaxDurationPresets: VideoDuration[] = Array.from(
-  { length: MINIMAX_H3_MAX_SECONDS - MINIMAX_H3_MIN_SECONDS + 1 },
-  (_, index) => index + MINIMAX_H3_MIN_SECONDS,
-)
+const miniMaxDurationShortcuts: VideoDuration[] = [5, 10, 15]
 const videoV2FallbackDurationPresets: VideoDuration[] = [15]
 const ratioPresets: VideoRatio[] = ['16:9', '9:16', '1:1', '4:3', '3:4']
 const videoV2RatioPresets: VideoRatio[] = ['21:9', '16:9', '9:16', '4:3', '1:1', '3:4']
@@ -332,6 +347,16 @@ const videoV2MediaConfig = {
     maxMegabytes: MAX_REFERENCE_AUDIO_MB,
     maxBytes: MAX_REFERENCE_AUDIO_BYTES,
   },
+  'video-audio': {
+    label: '视频配套音频',
+    token: 'VideoAudio',
+    accept: '.mp3,.wav,.m4a,.aac,.ogg,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/mp4,audio/m4a,audio/x-m4a,audio/aac,audio/x-aac,audio/ogg,application/ogg',
+    mimeTypes: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac', 'audio/x-aac', 'audio/ogg', 'application/ogg'],
+    formats: 'MP3 / WAV / M4A / AAC / OGG',
+    maxItems: MAX_VIDEO_V2_AUDIOS,
+    maxMegabytes: MAX_REFERENCE_AUDIO_MB,
+    maxBytes: MAX_REFERENCE_AUDIO_BYTES,
+  },
   video: {
     label: '参考视频',
     token: 'Video',
@@ -352,6 +377,13 @@ const videoV2ExtensionMimeTypes: Record<V2MediaKind, Record<string, string>> = {
     webp: 'image/webp',
   },
   audio: {
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    m4a: 'audio/mp4',
+    aac: 'audio/aac',
+    ogg: 'audio/ogg',
+  },
+  'video-audio': {
     mp3: 'audio/mpeg',
     wav: 'audio/wav',
     m4a: 'audio/mp4',
@@ -438,6 +470,7 @@ function App() {
   const [uploadedImages, setUploadedImages] = useState<UploadedAsset[]>([])
   const [grokReferenceImages, setGrokReferenceImages] = useState<UploadedAsset[]>([])
   const [uploadedAudios, setUploadedAudios] = useState<UploadedAsset[]>([])
+  const [uploadedVideoAudios, setUploadedVideoAudios] = useState<UploadedAsset[]>([])
   const [uploadedVideos, setUploadedVideos] = useState<UploadedAsset[]>([])
   const [uploadingImages, setUploadingImages] = useState(false)
   const [uploadingMediaKind, setUploadingMediaKind] = useState<V2MediaKind | null>(null)
@@ -462,16 +495,25 @@ function App() {
   const videoV3ModelSelected = isVideoV3Model(form.model)
   const videoV2ModelSelected = isVideoV2Model(form.model)
   const videoResourceModelSelected = videoV2ModelSelected || videoV3ModelSelected
+  const miniMaxAspectRatio = isValidMiniMaxH3AspectRatio(form.ratio)
+    ? form.ratio
+    : MINIMAX_H3_DEFAULT_ASPECT_RATIO
+  const miniMaxSizeOptions = getMiniMaxH3VideoSizesForAspectRatio(miniMaxAspectRatio)
+  const mediaResourceModelSelected = videoResourceModelSelected || miniMaxModelSelected
   const videoV2FallbackModelSelected = isVideoV2FallbackModel(form.model)
   const grokUsesMultipleReferences = grokModelSelected && mode === 'image' && uniqueUploadedAssetsById(grokReferenceImages).length > 1
-  const videoV2MediaLimits = videoV3ModelSelected ? VIDEO_V3_MEDIA_LIMITS : getVideoV2MediaLimits(form.model)
+  const videoV2MediaLimits = miniMaxModelSelected
+    ? { images: MINIMAX_H3_MAX_IMAGES, audios: MINIMAX_H3_MAX_AUDIOS, videos: MINIMAX_H3_MAX_VIDEOS }
+    : videoV3ModelSelected ? VIDEO_V3_MEDIA_LIMITS : getVideoV2MediaLimits(form.model)
   const videoV2ImageSizeLimit = getVideoV2ImageSizeLimit(form.model)
   const getVideoV2MediaLimit = (kind: V2MediaKind) => (
     kind === 'image'
       ? videoV2MediaLimits.images
       : kind === 'audio'
         ? videoV2MediaLimits.audios
-        : videoV2MediaLimits.videos
+        : kind === 'video'
+          ? videoV2MediaLimits.videos
+          : miniMaxModelSelected ? MINIMAX_H3_MAX_VIDEO_AUDIOS : 0
   )
   const playbackTaskId = task?.task_id || ''
   const playbackTaskModel = task?.model || ''
@@ -523,7 +565,7 @@ function App() {
         quality: parsed.quality ?? current.quality,
         resolution: parsed.resolution ?? current.resolution,
         size: parsed.size ?? current.size,
-        generateAudio: parsed.audio ?? parsed.generate_audio ?? current.generateAudio,
+        generateAudio: parsed.generate_audio ?? current.generateAudio,
         seed: parsed.seed ?? current.seed,
         bypassFaceCheck: parsed.bypass_face_check ?? current.bypassFaceCheck,
         gridStrength: parsed.grid_strength ?? current.gridStrength,
@@ -663,10 +705,8 @@ function App() {
   const currentLabel = statusLabel[currentStatus] ?? String(currentStatus)
   const selectedTaskUsesProtectedContent = Boolean(task && getVideoContentPath(task.model, task.task_id) && !task.result_url)
   const resultHref = selectedTaskUsesProtectedContent ? grokVideoObjectUrl : resolveVideoHref(task?.result_url)
-  const visibleDurationPresets = miniMaxModelSelected
-    ? miniMaxDurationPresets
-    : videoV3ModelSelected
-      ? videoV3DurationPresets
+  const visibleDurationPresets = videoV3ModelSelected
+    ? videoV3DurationPresets
     : grokModelSelected
     ? grokDurationPresets
     : videoV2FallbackModelSelected
@@ -697,6 +737,7 @@ function App() {
   const activeMediaUploadIds = new Set(activeTasks.flatMap((item) => [
     ...(item.reference_upload_ids ?? []),
     ...(item.reference_audio_upload_ids ?? []),
+    ...(item.reference_video_audio_upload_ids ?? []),
     ...(item.reference_video_upload_ids ?? []),
   ]))
   const referenceEditingLocked = submitting
@@ -709,7 +750,7 @@ function App() {
       return false
     }
   }
-  const configuredReferenceItems = videoResourceModelSelected
+  const configuredReferenceItems = mediaResourceModelSelected
     ? currentUploadedImages.slice(0, videoV2MediaLimits.images)
         .map((item, index) => ({ key: item.id, number: index + 1, url: item.url }))
     : imageSourceMode === 'upload'
@@ -721,7 +762,7 @@ function App() {
         .map((url, index) => ({ key: `url-${index}`, number: index + 1, url: url.trim() }))
   const configuredImageUrls = configuredReferenceItems.map((item) => item.url)
   const legacyReferenceInputPresent = mode === 'image' && (
-    currentUploadedImages.length > 0 || imageUrls.some((value) => value.trim())
+    currentUploadedImages.length > 0 || uploadedAudios.length > 0 || uploadedVideoAudios.length > 0 || uploadedVideos.length > 0 || imageUrls.some((value) => value.trim())
   )
   const referencePreviewItems = configuredReferenceItems.filter((item) => isHttpUrl(item.url))
   const mentionOptions = activeMention && !grokModelSelected && !miniMaxModelSelected
@@ -740,21 +781,42 @@ function App() {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
+  function updateMiniMaxAspectRatio(nextRatio: MiniMaxH3AspectRatio) {
+    setForm((current) => {
+      const currentRatio = isValidMiniMaxH3AspectRatio(current.ratio)
+        ? current.ratio
+        : MINIMAX_H3_DEFAULT_ASPECT_RATIO
+      const currentSizes = getMiniMaxH3VideoSizesForAspectRatio(currentRatio)
+      const nextSizes = getMiniMaxH3VideoSizesForAspectRatio(nextRatio)
+      const currentSizeIndex = Math.max(0, currentSizes.indexOf(current.size))
+      const nextSize = nextSizes[Math.min(currentSizeIndex, nextSizes.length - 1)] ?? MINIMAX_H3_DEFAULT_SIZE
+      return { ...current, ratio: nextRatio, size: nextSize }
+    })
+  }
+
   const changeModel = useCallback((nextModel: string) => {
     if (isMiniMaxH3VideoModel(nextModel)) {
-      setForm((current) => ({
-        ...current,
-        model: nextModel,
-        duration: isValidMiniMaxH3VideoSeconds(current.duration) ? current.duration : MINIMAX_H3_MIN_SECONDS,
-        ratio: ratioPresets.includes(current.ratio) ? current.ratio : '16:9',
-        quality: 'hd',
-        resolution: '480p',
-        size: isValidMiniMaxH3VideoSize(current.size) ? current.size : '2560x1440',
-        generateAudio: true,
-      }))
+      setForm((current) => {
+        const ratio = isValidMiniMaxH3AspectRatio(current.ratio)
+          ? current.ratio
+          : MINIMAX_H3_DEFAULT_ASPECT_RATIO
+        const sizes = getMiniMaxH3VideoSizesForAspectRatio(ratio)
+        const fallbackSize = ratio === MINIMAX_H3_DEFAULT_ASPECT_RATIO
+          ? MINIMAX_H3_DEFAULT_SIZE
+          : sizes[sizes.length - 1]
+        return {
+          ...current,
+          model: nextModel,
+          duration: isValidMiniMaxH3VideoSeconds(current.duration) ? current.duration : MINIMAX_H3_DEFAULT_SECONDS,
+          ratio,
+          quality: 'hd',
+          resolution: '480p',
+          size: sizes.includes(current.size) ? current.size : fallbackSize,
+        }
+      })
       setImageInputMode('multiple')
       setImageSourceMode('upload')
-      setMessage('MiniMax-H3-933-1440P-GF 支持文生和最多 5 张参考图；时长 5-15 秒，输出尺寸按接口枚举，默认生成音频')
+      setMessage(`MiniMax-H3-933-1440P-GF 使用 /v1/videos：支持 ${MINIMAX_H3_MIN_SECONDS}-${MINIMAX_H3_MAX_SECONDS} 秒、${MINIMAX_H3_MAX_IMAGES} 图、${MINIMAX_H3_MAX_VIDEOS} 视频、${MINIMAX_H3_MAX_VIDEO_AUDIOS} 个视频配套音频和 ${MINIMAX_H3_MAX_AUDIOS} 个独立参考音频`)
       return
     }
 
@@ -1008,7 +1070,7 @@ function App() {
       return
     }
     setMode(nextMode)
-    if (videoResourceModelSelected && nextMode === 'text' && (uploadedImages.length || uploadedAudios.length || uploadedVideos.length)) {
+    if (mediaResourceModelSelected && nextMode === 'text' && (uploadedImages.length || uploadedAudios.length || uploadedVideoAudios.length || uploadedVideos.length)) {
       setMessage('已切换纯文本；上传的参考素材会保留，但本次不会提交')
     }
   }
@@ -1329,6 +1391,7 @@ function App() {
   function getVideoV2Assets(kind: V2MediaKind) {
     if (kind === 'image') return uploadedImages
     if (kind === 'audio') return uploadedAudios
+    if (kind === 'video-audio') return uploadedVideoAudios
     return uploadedVideos
   }
 
@@ -1339,6 +1402,8 @@ function App() {
       setUploadedImages((current) => [...current, ...assets].slice(0, limit))
     } else if (kind === 'audio') {
       setUploadedAudios((current) => [...current, ...assets].slice(0, limit))
+    } else if (kind === 'video-audio') {
+      setUploadedVideoAudios((current) => [...current, ...assets].slice(0, limit))
     } else {
       setUploadedVideos((current) => [...current, ...assets].slice(0, limit))
     }
@@ -1401,10 +1466,10 @@ function App() {
         const response = await fetch('/api/uploads', { method: 'POST', body: formData })
         const data = await response.json().catch(() => ({}))
         const received = Array.isArray(data.files)
-          ? data.files.find((item: UploadedAsset) => item?.kind === kind)
+          ? data.files.find((item: UploadedAsset) => item?.kind === (kind === 'video-audio' ? 'audio' : kind))
           : null
         if (!response.ok || !received) throw new Error(data.error || `HTTP ${response.status}`)
-        uploaded.push(received)
+        uploaded.push(kind === 'video-audio' ? { ...received, kind } : received)
       }
 
       appendVideoV2Assets(kind, uploaded)
@@ -1449,6 +1514,7 @@ function App() {
 
     if (kind === 'image') setUploadedImages((current) => current.filter((item) => item.id !== asset.id))
     else if (kind === 'audio') setUploadedAudios((current) => current.filter((item) => item.id !== asset.id))
+    else if (kind === 'video-audio') setUploadedVideoAudios((current) => current.filter((item) => item.id !== asset.id))
     else setUploadedVideos((current) => current.filter((item) => item.id !== asset.id))
     await cleanupUploadedAssets([asset])
     setMessage(`已移除${videoV2MediaConfig[kind].label}${referenceNumber}`)
@@ -1479,8 +1545,8 @@ function App() {
 
   function changeImageInputMode(nextMode: ImageInputMode) {
     if (nextMode === imageInputMode) return
-    if (videoResourceModelSelected) {
-      setMessage(`${form.model} 固定按多素材数组提交，图片最多 ${videoV2MediaLimits.images} 张`)
+    if (mediaResourceModelSelected) {
+      setMessage(`${form.model} 固定按参考素材数组提交，图片最多 ${videoV2MediaLimits.images} 张`)
       return
     }
     if (grokModelSelected) {
@@ -1490,7 +1556,7 @@ function App() {
     }
     if (miniMaxModelSelected) {
       setImageInputMode('multiple')
-      setMessage(`MiniMax-H3-933-1440P-GF 固定使用 images 数组，最多 ${MAX_MINIMAX_IMAGES} 张参考图`)
+      setMessage(`MiniMax-H3-933-1440P-GF 使用参考素材数组，最多 ${MAX_MINIMAX_IMAGES} 张图片`)
       return
     }
     if (referenceControlsLocked || uploadInFlightRef.current) {
@@ -1614,25 +1680,27 @@ function App() {
     const historyUsesVideoV3 = isVideoV3Model(item.model)
     const historyUsesVideoResource = historyUsesVideoV2 || historyUsesVideoV3
     const historyUsesMiniMax = isMiniMaxH3VideoModel(item.model)
+    const historyUsesMediaResource = historyUsesVideoResource || historyUsesMiniMax
     const historyUsesGrok = isGrokImagineVideoModel(item.model)
-    const historyVideoV2Limits = historyUsesVideoV3 ? VIDEO_V3_MEDIA_LIMITS : getVideoV2MediaLimits(item.model)
+    const historyVideoV2Limits = historyUsesVideoV3 ? VIDEO_V3_MEDIA_LIMITS : historyUsesVideoV2 ? getVideoV2MediaLimits(item.model) : { images: MAX_MINIMAX_IMAGES, audios: MINIMAX_H3_MAX_AUDIOS, videos: MINIMAX_H3_MAX_VIDEOS }
     const referenceNumbers = historyUsesGrok ? [] : getReferenceMentionNumbers(item.prompt)
     const expectedReferenceCount = Math.max(Number(item.reference_count) || 0, ...referenceNumbers, 0)
-    const expectedAudioCount = historyUsesVideoResource ? Number(item.reference_audio_count) || 0 : 0
-    const expectedVideoCount = historyUsesVideoResource ? Number(item.reference_video_count) || 0 : 0
-    const imageLimit = historyUsesVideoResource
+    const expectedAudioCount = historyUsesMediaResource ? Number(item.reference_audio_count) || 0 : 0
+    const expectedVideoAudioCount = historyUsesMiniMax ? Number(item.reference_video_audio_count) || 0 : 0
+    const expectedVideoCount = historyUsesMediaResource ? Number(item.reference_video_count) || 0 : 0
+    const imageLimit = historyUsesMediaResource
       ? historyVideoV2Limits.images
       : historyUsesMiniMax
         ? MAX_MINIMAX_IMAGES
       : historyUsesGrok
         ? MAX_GROK_REFERENCE_IMAGES
         : MAX_REFERENCE_IMAGES
-    if (expectedReferenceCount > imageLimit || expectedAudioCount > historyVideoV2Limits.audios || expectedVideoCount > historyVideoV2Limits.videos) {
+    if (expectedReferenceCount > imageLimit || expectedAudioCount > historyVideoV2Limits.audios || expectedVideoAudioCount > (historyUsesMiniMax ? MINIMAX_H3_MAX_VIDEO_AUDIOS : 0) || expectedVideoCount > historyVideoV2Limits.videos) {
       setMessage('这条历史任务的参考素材数量超过当前模型限制，无法直接复用')
       return
     }
-    const expectedMediaCount = expectedReferenceCount + expectedAudioCount + expectedVideoCount
-    const draftHasMedia = uploadedImages.length > 0 || grokReferenceImages.length > 0 || uploadedAudios.length > 0 || uploadedVideos.length > 0 || imageUrls.some((value) => value.trim())
+    const expectedMediaCount = expectedReferenceCount + expectedAudioCount + expectedVideoAudioCount + expectedVideoCount
+    const draftHasMedia = uploadedImages.length > 0 || grokReferenceImages.length > 0 || uploadedAudios.length > 0 || uploadedVideoAudios.length > 0 || uploadedVideos.length > 0 || imageUrls.some((value) => value.trim())
     if (expectedMediaCount > 0 && draftHasMedia) {
       setMessage('当前草稿已有参考素材，为避免错绑，请先清空后再复用历史 Prompt')
       return
@@ -1645,7 +1713,7 @@ function App() {
         quality: item.quality ?? current.quality,
         resolution: item.resolution ?? current.resolution,
         size: item.size ?? current.size,
-        generateAudio: item.audio ?? item.generate_audio ?? current.generateAudio,
+        generateAudio: item.generate_audio ?? current.generateAudio,
         seed: item.seed ?? current.seed,
         bypassFaceCheck: item.bypass_face_check ?? current.bypassFaceCheck,
         gridStrength: item.grid_strength ?? current.gridStrength,
@@ -1655,10 +1723,10 @@ function App() {
     if (expectedMediaCount > 0) {
       setMode('image')
       setImageSourceMode('upload')
-      setImageInputMode(historyUsesVideoResource || historyUsesGrok || historyUsesMiniMax ? 'multiple' : 'single')
+      setImageInputMode(historyUsesMediaResource || historyUsesGrok ? 'multiple' : 'single')
       setImageUrls(Array.from({ length: expectedReferenceCount > 1 ? Math.max(2, expectedReferenceCount) : 1 }, () => ''))
-      setMessage(historyUsesVideoResource
-        ? `该任务使用 ${expectedReferenceCount} 图、${expectedAudioCount} 音频、${expectedVideoCount} 视频；历史记录不保存原文件，请按编号重新上传`
+      setMessage(historyUsesMediaResource
+        ? `该任务使用 ${expectedReferenceCount} 图、${expectedVideoAudioCount ? `${expectedVideoAudioCount} 个视频配套音频、` : ''}${expectedAudioCount} 个独立音频、${expectedVideoCount} 视频；历史记录不保存原文件，请重新上传`
         : `该历史任务使用了 ${expectedReferenceCount} 张参考图，历史记录不保存原图，请按编号重新上传`)
     } else {
       setMessage('已将历史 Prompt 载入生成控制台')
@@ -1978,12 +2046,12 @@ function App() {
     }
     if (useMiniMaxApi) {
       if (!isValidMiniMaxH3VideoSeconds(form.duration)) {
-        setMessage('MiniMax-H3-933-1440P-GF 的时长必须是 5 到 15 秒之间的整数')
+        setMessage(`MiniMax-H3-933-1440P-GF 的时长必须是 ${MINIMAX_H3_MIN_SECONDS} 到 ${MINIMAX_H3_MAX_SECONDS} 秒之间的整数`)
         setShowSettings(true)
         return
       }
-      if (!isValidMiniMaxH3VideoSize(form.size)) {
-        setMessage('MiniMax-H3-933-1440P-GF 的输出尺寸不支持')
+      if (form.size && !isValidMiniMaxH3VideoSize(form.size)) {
+        setMessage('MiniMax-H3-933-1440P-GF 的输出尺寸必须是宽x高格式，例如 1920x1080')
         setShowSettings(true)
         return
       }
@@ -1991,13 +2059,22 @@ function App() {
         setMessage(`MiniMax-H3-933-1440P-GF 最多支持 ${MAX_MINIMAX_IMAGES} 张参考图，请移除多余图片`)
         return
       }
-      if (uploadedAudios.length > 0 || uploadedVideos.length > 0) {
-        setMessage('MiniMax-H3-933-1440P-GF 只支持参考图片，不支持参考音频或参考视频')
+      if (uploadedAudios.length > MINIMAX_H3_MAX_AUDIOS || uploadedVideoAudios.length > MINIMAX_H3_MAX_VIDEO_AUDIOS || uploadedVideos.length > MINIMAX_H3_MAX_VIDEOS) {
+        setMessage(`MiniMax-H3-933-1440P-GF 最多支持 ${MAX_MINIMAX_IMAGES} 图、${MINIMAX_H3_MAX_VIDEOS} 视频、${MINIMAX_H3_MAX_VIDEO_AUDIOS} 个视频配套音频和 ${MINIMAX_H3_MAX_AUDIOS} 个独立参考音频`)
         return
       }
     }
     const miniMaxImages = useMiniMaxApi && submissionMode === 'image'
       ? uploadedImages.slice(0, MAX_MINIMAX_IMAGES)
+      : []
+    const miniMaxAudios = useMiniMaxApi && submissionMode === 'image'
+      ? uploadedAudios.slice(0, MINIMAX_H3_MAX_AUDIOS)
+      : []
+    const miniMaxVideoAudios = useMiniMaxApi && submissionMode === 'image'
+      ? uploadedVideoAudios.slice(0, MINIMAX_H3_MAX_VIDEO_AUDIOS)
+      : []
+    const miniMaxVideos = useMiniMaxApi && submissionMode === 'image'
+      ? uploadedVideos.slice(0, MINIMAX_H3_MAX_VIDEOS)
       : []
     const videoV2Images = useVideoResourceApi && submissionMode === 'image'
       ? uploadedImages.slice(0, videoV2SubmissionLimits.images)
@@ -2018,8 +2095,15 @@ function App() {
       : useGrokApi
         ? grokUploadedImages.map((item) => item.url)
         : [...configuredImageUrls]
-    const referenceAudioUrls = videoV2Audios.map((item) => item.url)
-    const referenceVideoUrls = videoV2Videos.map((item) => item.url)
+    const referenceAudioUrls = useMiniMaxApi
+      ? miniMaxAudios.map((item) => item.url)
+      : videoV2Audios.map((item) => item.url)
+    const referenceVideoAudioUrls = useMiniMaxApi
+      ? miniMaxVideoAudios.map((item) => item.url)
+      : []
+    const referenceVideoUrls = useMiniMaxApi
+      ? miniMaxVideos.map((item) => item.url)
+      : videoV2Videos.map((item) => item.url)
     const referenceUploadIds = submissionMode === 'image' && (useVideoResourceApi || useMiniMaxApi || submissionImageSourceMode === 'upload')
       ? (useVideoResourceApi
           ? videoV2Images
@@ -2031,8 +2115,9 @@ function App() {
               ? uploadedImages
               : uploadedImages.slice(0, 1)).map((item) => item.id)
       : []
-    const referenceAudioUploadIds = videoV2Audios.map((item) => item.id)
-    const referenceVideoUploadIds = videoV2Videos.map((item) => item.id)
+    const referenceAudioUploadIds = useMiniMaxApi ? miniMaxAudios.map((item) => item.id) : videoV2Audios.map((item) => item.id)
+    const referenceVideoAudioUploadIds = useMiniMaxApi ? miniMaxVideoAudios.map((item) => item.id) : []
+    const referenceVideoUploadIds = useMiniMaxApi ? miniMaxVideos.map((item) => item.id) : videoV2Videos.map((item) => item.id)
     let submittedPrompt = rawPrompt
 
     if (useGrokApi) {
@@ -2086,7 +2171,24 @@ function App() {
       }
     }
 
-    if (useVideoResourceApi) {
+    if (useMiniMaxApi) {
+      const miniMaxTotalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoAudioUrls.length + referenceVideoUrls.length
+      if (submissionMode === 'image' && miniMaxTotalReferences === 0) {
+        setMessage('MiniMax-H3-933-1440P-GF 的参考素材模式至少需要上传一张图片、一个视频或一个音频')
+        return
+      }
+      const allMiniMaxUrls = [
+        ...referenceUrls,
+        ...referenceAudioUrls,
+        ...referenceVideoAudioUrls,
+        ...referenceVideoUrls,
+      ]
+      const invalidReferenceIndex = allMiniMaxUrls.findIndex((url) => !isHttpUrl(url))
+      if (invalidReferenceIndex >= 0) {
+        setMessage('参考素材外链无效，请重新上传对应文件')
+        return
+      }
+    } else if (useVideoResourceApi) {
       if (useVideoV2Fallback) {
         if (formSnapshot.duration !== 15) {
           setMessage('video-v2-满血兜底版固定生成 15 秒视频')
@@ -2115,25 +2217,13 @@ function App() {
         return
       }
       submittedPrompt = compilation.prompt
-    } else if (useMiniMaxApi && submissionMode === 'image' && referenceUrls.length === 0) {
-      setMessage('MiniMax-H3-933-1440P-GF 的参考图模式至少需要上传一张图片')
-      return
     } else if (submissionMode === 'image') {
-      const minimumReferences = useGrokApi || useMiniMaxApi ? 1 : submissionInputMode === 'multiple' ? 2 : 1
+      const minimumReferences = useGrokApi ? 1 : submissionInputMode === 'multiple' ? 2 : 1
       if (referenceUrls.length < minimumReferences) {
-        setMessage(useMiniMaxApi
-          ? 'MiniMax-H3-933-1440P-GF 的参考图模式至少需要 1 张图片'
-          : submissionInputMode === 'multiple' ? '多图生视频至少需要 2 张参考图' : '图生视频需要 1 张参考图')
+        setMessage(submissionInputMode === 'multiple' ? '多图生视频至少需要 2 张参考图' : '图生视频需要 1 张参考图')
         return
       }
-      if (useMiniMaxApi) {
-        const invalidReferenceIndex = referenceUrls.findIndex((url) => !isHttpUrl(url))
-        if (invalidReferenceIndex >= 0) {
-          setMessage(`第${invalidReferenceIndex + 1}张参考图外链无效，请重新上传图片`)
-          return
-        }
-      }
-      if (!useGrokApi && !useMiniMaxApi) {
+      if (!useGrokApi) {
         const invalidReferenceIndex = referenceUrls.findIndex((url) => !isHttpUrl(url))
         if (invalidReferenceIndex >= 0) {
           setMessage(`参考图${invalidReferenceIndex + 1}的 URL 为空或格式不正确，请补充或移除该行`)
@@ -2193,8 +2283,10 @@ function App() {
             prompt: submittedPrompt,
             seconds: formSnapshot.duration,
             size: formSnapshot.size,
-            audio: formSnapshot.generateAudio,
             images: referenceUrls,
+            referenceVideos: referenceVideoUrls,
+            referenceVideoAudios: referenceVideoAudioUrls,
+            referenceAudios: referenceAudioUrls,
           })
       : useVideoV3Api
         ? buildVideoV3SubmitPayload({
@@ -2332,17 +2424,18 @@ function App() {
           resolution: useGrokApi ? formSnapshot.resolution : useVideoV2Fallback ? '720p' : useVideoV3Api ? VIDEO_V3_RESOLUTION : useVideoV2Api ? formSnapshot.resolution : undefined,
           generate_audio: useVideoV2Fallback ? false : useVideoResourceApi ? formSnapshot.generateAudio : undefined,
           size: useMiniMaxApi ? formSnapshot.size : undefined,
-          audio: useMiniMaxApi ? formSnapshot.generateAudio : undefined,
           seed: useVideoV3Api && formSnapshot.seed !== '' ? formSnapshot.seed : undefined,
           bypass_face_check: useVideoV3Api ? formSnapshot.bypassFaceCheck : undefined,
           grid_strength: useVideoV3Api && formSnapshot.gridStrength !== '' ? formSnapshot.gridStrength : undefined,
           prompt: rawPrompt,
           submitted_prompt: submittedPrompt,
           reference_count: submissionMode === 'image' ? referenceUrls.length : 0,
-          reference_audio_count: useVideoResourceApi ? referenceAudioUrls.length : 0,
-          reference_video_count: useVideoResourceApi ? referenceVideoUrls.length : 0,
+          reference_audio_count: (useVideoResourceApi || useMiniMaxApi) ? referenceAudioUrls.length : 0,
+          reference_video_audio_count: useMiniMaxApi ? referenceVideoAudioUrls.length : 0,
+          reference_video_count: (useVideoResourceApi || useMiniMaxApi) ? referenceVideoUrls.length : 0,
           reference_upload_ids: referenceUploadIds,
           reference_audio_upload_ids: referenceAudioUploadIds,
+          reference_video_audio_upload_ids: referenceVideoAudioUploadIds,
           reference_video_upload_ids: referenceVideoUploadIds,
           video_mode: submissionMode,
           image_input_mode: submissionMode === 'image' ? submissionInputMode : undefined,
@@ -2405,7 +2498,7 @@ function App() {
       ...(kind === 'image' ? videoV2ImageSizeLimit : {}),
     }
     const assets = getVideoV2Assets(kind)
-    const Icon = kind === 'image' ? Images : kind === 'audio' ? FileMusic : FileVideoCamera
+    const Icon = kind === 'image' ? Images : kind === 'video' || kind === 'video-audio' ? (kind === 'video-audio' ? FileMusic : FileVideoCamera) : FileMusic
     const isUploading = uploadingMediaKind === kind
     const isDragging = draggingMediaKind === kind
     const inputId = `video-v2-${kind}-file`
@@ -2464,16 +2557,18 @@ function App() {
                   <span className="video-v2-media-type" aria-hidden="true"><Icon size={15} /></span>
                 )}
                 <span className="video-v2-media-name" title={asset.name || asset.id}>{asset.name || asset.id}</span>
-                <button
-                  type="button"
-                  className="video-v2-mention-btn"
-                  onClick={() => insertVideoV2MediaMention(kind, index + 1)}
-                  disabled={referenceEditingLocked}
-                  aria-label={`在 Prompt 中插入 @${config.token}${index + 1}`}
-                  title={`插入 @${config.token}${index + 1}`}
-                >
-                  <AtSign size={13} aria-hidden="true" />{config.token}{index + 1}
-                </button>
+                {!miniMaxModelSelected && (
+                  <button
+                    type="button"
+                    className="video-v2-mention-btn"
+                    onClick={() => insertVideoV2MediaMention(kind, index + 1)}
+                    disabled={referenceEditingLocked}
+                    aria-label={`在 Prompt 中插入 @${config.token}${index + 1}`}
+                    title={`插入 @${config.token}${index + 1}`}
+                  >
+                    <AtSign size={13} aria-hidden="true" />{config.token}{index + 1}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="video-v2-remove-btn"
@@ -2816,25 +2911,27 @@ function App() {
                   onClick={() => changeVideoMode('image')}
                   disabled={referenceControlsLocked}
                 >
-                  <ImageIcon size={14} /> {videoResourceModelSelected ? '参考素材' : '图生视频'}
+                  <ImageIcon size={14} /> {mediaResourceModelSelected ? '参考素材' : '图生视频'}
                 </button>
               </div>
             </div>
 
-            {mode === 'image' && (videoResourceModelSelected ? (
+            {mode === 'image' && (mediaResourceModelSelected ? (
               <div className="video-v2-media-panel">
                 <div className="video-v2-media-panel-head">
                   <div>
                     <strong>参考素材</strong>
-                     <span>提交时会以外链数组发送给当前模型的 JSON 协议</span>
+                    <span>提交时会以公网外链发送给当前模型的 JSON 协议</span>
                   </div>
-                  <span className="badge">{videoV2MediaLimits.images} 图 · {videoV2MediaLimits.audios} 音频 · {videoV2MediaLimits.videos} 视频</span>
+                  <span className="badge">{videoV2MediaLimits.images} 图 · {videoV2MediaLimits.videos} 视频 · {miniMaxModelSelected ? `${MINIMAX_H3_MAX_VIDEO_AUDIOS} 个视频配套音频 · ${MINIMAX_H3_MAX_AUDIOS} 个独立音频` : `${videoV2MediaLimits.audios} 音频`}</span>
                 </div>
                 <div className="video-v2-media-grid">
-                  {(['image', 'audio', 'video'] as V2MediaKind[]).map(renderVideoV2MediaSection)}
+                  {(['image', 'video', 'audio', ...(miniMaxModelSelected ? ['video-audio'] : [])] as V2MediaKind[]).map(renderVideoV2MediaSection)}
                 </div>
                 <div className="field-hint">
-                  {videoV3ModelSelected
+                  {miniMaxModelSelected
+                    ? 'MiniMax-H3 会按 images、reference_videos、reference_video_audios、reference_audios 字段提交；相同 URL 或文件名会自动去重，不使用 @Image/@Audio 引用。'
+                    : videoV3ModelSelected
                     ? 'SD2.5 仅有图片时以 images 外链数组提交；存在参考视频或音频时，会按文档改用 content[] 中的 image_url、video_url、audio_url。图片最多 30 张，视频和音频各最多 10 个。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
                 </div>
@@ -3036,7 +3133,7 @@ function App() {
                     {grokModelSelected
                       ? 'Grok Imagine 1.5 仅支持本地上传的真实参考图文件；提交时会按上传顺序重复写入 multipart 的 input_reference 字段，不使用图片 URL 或 @参考图引用。实际格式、数量与请求体限制以渠道返回为准。'
                       : miniMaxModelSelected
-                        ? 'MiniMax-H3-933-1440P-GF 使用项目域名生成临时图片外链，提交时以 images URL 数组发送，最多 5 张；服务器每 12 小时清理过期文件。'
+                        ? 'MiniMax-H3 使用项目域名生成临时外链，提交时按文档字段发送；图片/视频/音频分别去重，服务器每 12 小时清理过期文件。'
                       : imageSourceMode === 'upload'
                         ? '任务成功或失败后仍可复用，服务器每 12 小时清理一次已超过 12 小时的图片。'
                         : '使用上游可访问的图片直链，只发送 URL，不上传文件到服务器。'}
@@ -3258,7 +3355,39 @@ function App() {
 
                 <div className={`options-group ${grokModelSelected ? 'grok-option-group' : ''}`} style={{ marginTop: 8 }}>
                   <span className="options-group-label"><Clock size={14} /> 渲染时长</span>
-                  {videoV3ModelSelected ? (
+                  {miniMaxModelSelected ? (
+                    <div className="minimax-duration-control">
+                      <label className="video-v3-number-control" htmlFor="minimax-duration">
+                        <input
+                          id="minimax-duration"
+                          type="number"
+                          min={MINIMAX_H3_MIN_SECONDS}
+                          max={MINIMAX_H3_MAX_SECONDS}
+                          step="1"
+                          inputMode="numeric"
+                          value={form.duration}
+                          onChange={(event) => {
+                            const nextDuration = Number(event.target.value)
+                            if (Number.isFinite(nextDuration)) updateField('duration', Math.trunc(nextDuration))
+                          }}
+                          aria-label="MiniMax-H3 渲染时长"
+                        />
+                        <span>秒（{MINIMAX_H3_MIN_SECONDS}-{MINIMAX_H3_MAX_SECONDS}）</span>
+                      </label>
+                      <div className="segmented minimax-duration-shortcuts" aria-label="MiniMax-H3 常用时长">
+                        {miniMaxDurationShortcuts.map((val) => (
+                          <button
+                            type="button"
+                            key={val}
+                            className={`segmented-item ${form.duration === val ? 'is-active' : ''}`}
+                            onClick={() => updateField('duration', val)}
+                          >
+                            {val}秒
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : videoV3ModelSelected ? (
                     <label className="video-v3-number-control">
                       <input
                         type="number"
@@ -3312,38 +3441,28 @@ function App() {
                 {miniMaxModelSelected ? (
                   <>
                     <div className="options-group" style={{ marginTop: 8 }}>
-                      <span className="options-group-label"><Settings2 size={14} /> 输出尺寸</span>
-                      <div className="segmented size-segmented">
-                        {MINIMAX_H3_VIDEO_SIZES.map((val) => (
-                          <button
-                            type="button"
-                            key={val}
-                            className={`segmented-item ${form.size === val ? 'is-active' : ''}`}
-                            onClick={() => updateField('size', val)}
-                          >
-                            {val}
-                          </button>
-                        ))}
-                      </div>
+                      <label className="options-group-label" htmlFor="minimax-aspect-ratio"><Layout size={14} /> 画幅</label>
+                      <select
+                        id="minimax-aspect-ratio"
+                        className="minimax-select"
+                        value={miniMaxAspectRatio}
+                        onChange={(event) => updateMiniMaxAspectRatio(event.target.value as MiniMaxH3AspectRatio)}
+                      >
+                        {MINIMAX_H3_ASPECT_RATIOS.map((ratio) => <option key={ratio} value={ratio}>{ratio}</option>)}
+                      </select>
                     </div>
                     <div className="options-group" style={{ marginTop: 8 }}>
-                      <span className="options-group-label"><Settings2 size={14} /> 生成音频</span>
-                      <div className="segmented">
-                        <button
-                          type="button"
-                          className={`segmented-item ${form.generateAudio ? 'is-active' : ''}`}
-                          onClick={() => updateField('generateAudio', true)}
-                        >
-                          开启
-                        </button>
-                        <button
-                          type="button"
-                          className={`segmented-item ${!form.generateAudio ? 'is-active' : ''}`}
-                          onClick={() => updateField('generateAudio', false)}
-                        >
-                          关闭
-                        </button>
-                      </div>
+                      <label className="options-group-label" htmlFor="minimax-size"><Settings2 size={14} /> 输出分辨率</label>
+                      <select
+                        id="minimax-size"
+                        className="minimax-select"
+                        value={form.size}
+                        onChange={(event) => updateField('size', event.target.value as VideoSize)}
+                      >
+                        {!miniMaxSizeOptions.includes(form.size) && <option value={form.size}>{form.size}（历史尺寸）</option>}
+                        {[...new Set(miniMaxSizeOptions)].map((size) => <option key={size} value={size}>{size}</option>)}
+                      </select>
+                      <span className="field-hint">已按当前画幅列出全部可选尺寸。提交时仅发送该尺寸，其余高级参数由上游默认处理。</span>
                     </div>
                   </>
                 ) : videoV3ModelSelected ? (
@@ -3551,11 +3670,12 @@ function App() {
               <dl className="task-detail-grid">
                 <div><dt>状态</dt><dd>{statusLabel[detailTask.status] ?? detailTask.status} · {detailTask.progress}%</dd></div>
                 <div><dt>模型</dt><dd>{detailTask.model || '-'}</dd></div>
-                <div><dt>生成模式</dt><dd>{(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model)) ? (detailTask.video_mode === 'image' ? '参考素材' : '文生视频') : (detailTask.video_mode ?? (detailTask.reference_count ? 'image' : 'text')) === 'image' ? '图生视频' : '文生视频'}</dd></div>
+                <div><dt>生成模式</dt><dd>{(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model) || isMiniMaxH3VideoModel(detailTask.model)) ? (detailTask.video_mode === 'image' ? '参考素材' : '文生视频') : (detailTask.video_mode ?? (detailTask.reference_count ? 'image' : 'text')) === 'image' ? '图生视频' : '文生视频'}</dd></div>
                 <div><dt>参考图</dt><dd>{detailTask.reference_count ?? 0} 张{detailTask.image_input_mode === 'multiple' ? ' · 多图' : detailTask.image_input_mode === 'single' ? ' · 单图' : ''}</dd></div>
-                {(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model)) && <div><dt>参考音频</dt><dd>{detailTask.reference_audio_count ?? 0} 个</dd></div>}
-                {(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model)) && <div><dt>参考视频</dt><dd>{detailTask.reference_video_count ?? 0} 个</dd></div>}
-                {(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model) || isMiniMaxH3VideoModel(detailTask.model)) && <div><dt>生成音频</dt><dd>{isMiniMaxH3VideoModel(detailTask.model) ? (detailTask.audio === undefined ? '-' : detailTask.audio ? '开启' : '关闭') : detailTask.generate_audio === undefined ? '-' : detailTask.generate_audio ? '开启' : '关闭'}</dd></div>}
+                {(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model) || isMiniMaxH3VideoModel(detailTask.model)) && <div><dt>独立参考音频</dt><dd>{detailTask.reference_audio_count ?? 0} 个</dd></div>}
+                {isMiniMaxH3VideoModel(detailTask.model) && <div><dt>视频配套音频</dt><dd>{detailTask.reference_video_audio_count ?? 0} 个</dd></div>}
+                {(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model) || isMiniMaxH3VideoModel(detailTask.model)) && <div><dt>参考视频</dt><dd>{detailTask.reference_video_count ?? 0} 个</dd></div>}
+                {(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model)) && <div><dt>生成音频</dt><dd>{detailTask.generate_audio === undefined ? '-' : detailTask.generate_audio ? '开启' : '关闭'}</dd></div>}
                 <div><dt>视频时长</dt><dd>{(detailTask.seconds ?? detailTask.duration) ? `${detailTask.seconds ?? detailTask.duration} 秒` : '-'}</dd></div>
                 {!isMiniMaxH3VideoModel(detailTask.model) && <div><dt>画幅</dt><dd>{detailTask.ratio ?? '-'}</dd></div>}
                 <div><dt>输出规格</dt><dd>{isMiniMaxH3VideoModel(detailTask.model) ? detailTask.size ?? '-' : detailTask.resolution ?? detailTask.quality?.toUpperCase() ?? '-'}</dd></div>

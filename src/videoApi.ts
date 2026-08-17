@@ -1,8 +1,9 @@
 import { isVideoV2Model } from './v2Media.ts'
 import { isVideoV3Model } from './videoV3.ts'
+import { isMiniMaxH3VideoModel } from './minimaxH3.ts'
 
 export { isVideoV2Model, VIDEO_V2_MODELS } from './v2Media.ts'
-export { isMiniMaxH3VideoModel, MINIMAX_H3_VIDEO_MODEL } from './minimaxH3.ts'
+export { isMiniMaxH3VideoModel, MINIMAX_H3_VIDEO_MODEL, MINIMAX_H3_VIDEO_MODELS } from './minimaxH3.ts'
 export {
   getVideoV3MediaLimits,
   isValidVideoV3Duration,
@@ -32,7 +33,10 @@ export function isGrokImagineVideoModel(model: unknown) {
 }
 
 function usesVideoResourceApi(model: unknown) {
-  return isGrokImagineVideoModel(model) || isVideoV2Model(model) || isVideoV3Model(model)
+  return isGrokImagineVideoModel(model)
+    || isVideoV2Model(model)
+    || isVideoV3Model(model)
+    || isMiniMaxH3VideoModel(model)
 }
 
 export function getVideoSubmitPath(model: string) {

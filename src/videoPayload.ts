@@ -1,9 +1,14 @@
 import { isVideoV2FallbackModel } from './v2Media.ts'
 import {
   isMiniMaxH3VideoModel,
+  isValidMiniMaxH3Multiple,
   isValidMiniMaxH3VideoSeconds,
   isValidMiniMaxH3VideoSize,
+  MINIMAX_H3_DEFAULT_SECONDS,
+  MINIMAX_H3_MAX_AUDIOS,
   MINIMAX_H3_MAX_IMAGES,
+  MINIMAX_H3_MAX_VIDEO_AUDIOS,
+  MINIMAX_H3_MAX_VIDEOS,
   type MiniMaxH3VideoSize,
 } from './minimaxH3.ts'
 import {
@@ -41,10 +46,44 @@ export type VideoV2SubmitPayloadInput = {
 export type MiniMaxH3SubmitPayloadInput = {
   model: string
   prompt: string
-  seconds: number
-  size: MiniMaxH3VideoSize
-  audio: boolean
-  images: readonly string[]
+  /** `duration` takes precedence when both duration aliases are supplied. */
+  duration?: number | string
+  /** Preferred duration field in the public MiniMax-H3 contract. */
+  seconds?: number | string
+  size?: MiniMaxH3VideoSize | string
+  mode?: 'first_last_frame'
+  audio?: boolean
+  promptEnhance?: boolean
+  prompt_enhance?: boolean
+  resolution?: string
+  clarity?: string
+  aspectRatio?: string
+  aspect_ratio?: string
+  megapixels?: number | string
+  metadata?: { multiple?: number | string }
+  metadataMultiple?: number | string
+  multiple?: number | string
+  images?: readonly string[]
+  referenceImages?: readonly string[]
+  reference_images?: readonly string[]
+  inputReference?: string | readonly string[]
+  input_reference?: string | readonly string[]
+  image?: string | readonly string[]
+  referenceVideos?: readonly string[]
+  reference_videos?: readonly string[]
+  referenceVideo?: string | readonly string[]
+  reference_video?: string | readonly string[]
+  referenceVideoAudios?: readonly string[]
+  reference_video_audios?: readonly string[]
+  referenceVideoAudio?: string | readonly string[]
+  reference_video_audio?: string | readonly string[]
+  /** Independent reference audio (music, voice-over, etc.). */
+  referenceAudios?: readonly string[]
+  reference_audios?: readonly string[]
+  referenceAudio?: string | readonly string[]
+  reference_audio?: string | readonly string[]
+  /** Alias used by the existing form for independent reference audio. */
+  audios?: readonly string[]
 }
 
 export type VideoV3SubmitPayloadInput = {
@@ -91,6 +130,71 @@ function normalizeUrls(urls: readonly string[], label: string, limit: number) {
   const unique = [...new Set(normalized)]
   if (unique.length > limit) throw new Error(`SD2.5 最多支持 ${limit} 个${label}`)
   return unique
+}
+
+/** Normalize MiniMax reference URLs and remove duplicate URLs/file names. */
+function normalizeMiniMaxUrls(
+  urls: readonly string[] | undefined,
+  label: string,
+  limit: number,
+) {
+  if (urls === undefined) return [] as string[]
+  if (!Array.isArray(urls)) throw new Error(`MiniMax-H3 的 ${label} 必须是 URL 数组`)
+
+  const unique: string[] = []
+  const seenUrls = new Set<string>()
+  const seenFileNames = new Set<string>()
+  for (const rawUrl of urls) {
+    if (typeof rawUrl !== 'string' || !rawUrl.trim()) {
+      throw new Error(`MiniMax-H3 的 ${label} 必须是非空 URL`)
+    }
+    const url = rawUrl.trim()
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      throw new Error(`MiniMax-H3 的 ${label} 必须是公网 http/https URL`)
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error(`MiniMax-H3 的 ${label} 必须是公网 http/https URL`)
+    }
+
+    // The API cannot fetch local paths or loopback/private hosts.
+    const hostname = parsed.hostname.toLowerCase()
+    const isPrivateIpv4 = /^(10|127|169\.254|192\.168)\./.test(hostname)
+      || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+      || hostname === '0.0.0.0'
+    if (hostname === 'localhost' || hostname === '[::1]' || isPrivateIpv4) {
+      throw new Error(`MiniMax-H3 的 ${label} 必须是公网 http/https URL`)
+    }
+
+    const canonicalUrl = parsed.toString()
+    const pathName = decodeURIComponent(parsed.pathname).split('/').filter(Boolean).pop()?.trim().toLowerCase() || ''
+    const fileNameKey = pathName && /\.[a-z0-9]{1,12}$/i.test(pathName) ? pathName : ''
+    if (seenUrls.has(canonicalUrl) || (fileNameKey && seenFileNames.has(fileNameKey))) continue
+    seenUrls.add(canonicalUrl)
+    if (fileNameKey) seenFileNames.add(fileNameKey)
+    unique.push(url)
+  }
+
+  if (unique.length > limit) throw new Error(`MiniMax-H3 最多支持 ${limit} 个${label}`)
+  return unique
+}
+
+type MiniMaxUrlValue = string | readonly string[] | undefined
+
+function miniMaxUrlValues(value: MiniMaxUrlValue, label: string) {
+  if (value === undefined) return [] as string[]
+  if (typeof value === 'string') return [value]
+  if (!Array.isArray(value)) throw new Error(`MiniMax-H3 的 ${label} 必须是 URL 或 URL 数组`)
+  return [...value]
+}
+
+function normalizeOptionalMiniMaxString(value: unknown, wireKey: string) {
+  if (value === undefined) return undefined
+  if (typeof value !== 'string') throw new Error(`MiniMax-H3 的 ${wireKey} 必须是字符串`)
+  const normalized = value.trim()
+  return normalized || undefined
 }
 
 /** Build the documented SD2.5 JSON protocol for video-v3. */
@@ -143,43 +247,144 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
   return payload
 }
 
-/** Build only the fields accepted by MiniMax-H3-933-1440P-GF. */
+/** Build the documented JSON protocol for MiniMax-H3-933-1440P-GF. */
 export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) {
   if (!isMiniMaxH3VideoModel(input.model)) {
     throw new Error('MiniMax-H3 视频表单只能用于 MiniMax-H3-933-1440P-GF')
   }
-  if (!input.prompt.trim()) throw new Error('Prompt 不能为空')
-  if (!isValidMiniMaxH3VideoSeconds(input.seconds)) {
-    throw new Error('MiniMax-H3-933-1440P-GF 的 seconds 必须是 5 到 15 之间的整数')
+  if (typeof input.prompt !== 'string' || !input.prompt.trim()) throw new Error('Prompt 不能为空')
+
+  // Keep the wire alias supplied by the caller. If both are present, the
+  // documented precedence is duration over seconds.
+  const hasDuration = input.duration !== undefined && input.duration !== ''
+  const hasSeconds = input.seconds !== undefined && input.seconds !== ''
+  const selectedDuration = hasDuration
+    ? input.duration
+    : hasSeconds
+      ? input.seconds
+      : MINIMAX_H3_DEFAULT_SECONDS
+  if (!isValidMiniMaxH3VideoSeconds(selectedDuration)) {
+    throw new Error('MiniMax-H3-933-1440P-GF 的 duration/seconds 必须是 4 到 15 之间的整数')
   }
-  if (!isValidMiniMaxH3VideoSize(input.size)) {
-    throw new Error('MiniMax-H3-933-1440P-GF 不支持该视频尺寸')
-  }
-  if (!Array.isArray(input.images) || input.images.length > MINIMAX_H3_MAX_IMAGES) {
-    throw new Error(`MiniMax-H3-933-1440P-GF 最多支持 ${MINIMAX_H3_MAX_IMAGES} 张参考图`)
-  }
-  if (input.images.some((url) => typeof url !== 'string' || !url.trim())) {
-    throw new Error('MiniMax-H3-933-1440P-GF 的 images 必须是非空 URL')
-  }
-  if (typeof input.audio !== 'boolean') {
-    throw new Error('MiniMax-H3-933-1440P-GF 的 audio 必须是布尔值')
+  const normalizedDuration = Number(selectedDuration)
+
+  let size: MiniMaxH3VideoSize | undefined
+  if (input.size !== undefined && input.size !== '') {
+    if (!isValidMiniMaxH3VideoSize(input.size)) {
+      throw new Error('MiniMax-H3-933-1440P-GF 不支持该视频尺寸')
+    }
+    size = input.size.trim() as MiniMaxH3VideoSize
   }
 
-  const payload: {
-    model: string
-    prompt: string
-    seconds: number
-    size: MiniMaxH3VideoSize
-    audio: boolean
-    images?: string[]
-  } = {
+  if (input.audio !== undefined && typeof input.audio !== 'boolean') {
+    throw new Error('MiniMax-H3-933-1440P-GF 的 audio 必须是布尔值')
+  }
+  const promptEnhance = input.promptEnhance ?? input.prompt_enhance
+  if (promptEnhance !== undefined && typeof promptEnhance !== 'boolean') {
+    throw new Error('MiniMax-H3-933-1440P-GF 的 prompt_enhance 必须是布尔值')
+  }
+
+  const resolution = normalizeOptionalMiniMaxString(input.resolution, 'resolution')
+  const clarity = normalizeOptionalMiniMaxString(input.clarity, 'clarity')
+  const aspectRatio = normalizeOptionalMiniMaxString(input.aspectRatio ?? input.aspect_ratio, 'aspect_ratio')
+  const megapixels = input.megapixels
+  const hasMegapixels = megapixels !== undefined && !(typeof megapixels === 'string' && !megapixels.trim())
+  let normalizedMegapixels: number | undefined
+  if (hasMegapixels) {
+    normalizedMegapixels = typeof megapixels === 'number' ? megapixels : Number(megapixels)
+    if (!Number.isFinite(normalizedMegapixels) || normalizedMegapixels <= 0) {
+      throw new Error('MiniMax-H3 的 megapixels 必须是正数')
+    }
+  }
+
+  const hasOptionalValue = (value: unknown) => value !== undefined && !(typeof value === 'string' && !value.trim())
+  const metadataMultiple = hasOptionalValue(input.metadataMultiple)
+    ? input.metadataMultiple
+    : hasOptionalValue(input.multiple)
+      ? input.multiple
+      : hasOptionalValue(input.metadata?.multiple)
+        ? input.metadata?.multiple
+        : undefined
+  if (metadataMultiple !== undefined && metadataMultiple !== '' && !isValidMiniMaxH3Multiple(metadataMultiple)) {
+    throw new Error('MiniMax-H3 的 metadata.multiple 必须是 8-128 且为 4 的倍数')
+  }
+  const normalizedMultiple = metadataMultiple === undefined || metadataMultiple === ''
+    ? undefined
+    : Number(metadataMultiple)
+
+  const images = normalizeMiniMaxUrls(
+    [
+      ...miniMaxUrlValues(input.images, '参考图片'),
+      ...miniMaxUrlValues(input.referenceImages, '参考图片'),
+      ...miniMaxUrlValues(input.reference_images, '参考图片'),
+      ...miniMaxUrlValues(input.inputReference, '参考图片'),
+      ...miniMaxUrlValues(input.input_reference, '参考图片'),
+      ...miniMaxUrlValues(input.image, '参考图片'),
+    ],
+    '参考图片',
+    MINIMAX_H3_MAX_IMAGES,
+  )
+  const referenceVideos = normalizeMiniMaxUrls(
+    [
+      ...miniMaxUrlValues(input.referenceVideos, '参考视频'),
+      ...miniMaxUrlValues(input.reference_videos, '参考视频'),
+      ...miniMaxUrlValues(input.referenceVideo, '参考视频'),
+      ...miniMaxUrlValues(input.reference_video, '参考视频'),
+    ],
+    '参考视频',
+    MINIMAX_H3_MAX_VIDEOS,
+  )
+  const referenceVideoAudios = normalizeMiniMaxUrls(
+    [
+      ...miniMaxUrlValues(input.referenceVideoAudios, '视频配套音频'),
+      ...miniMaxUrlValues(input.reference_video_audios, '视频配套音频'),
+      ...miniMaxUrlValues(input.referenceVideoAudio, '视频配套音频'),
+      ...miniMaxUrlValues(input.reference_video_audio, '视频配套音频'),
+    ],
+    '视频配套音频',
+    MINIMAX_H3_MAX_VIDEO_AUDIOS,
+  )
+  const referenceAudios = normalizeMiniMaxUrls(
+    [
+      ...miniMaxUrlValues(input.audios, '独立参考音频'),
+      ...miniMaxUrlValues(input.referenceAudios, '独立参考音频'),
+      ...miniMaxUrlValues(input.reference_audios, '独立参考音频'),
+      ...miniMaxUrlValues(input.referenceAudio, '独立参考音频'),
+      ...miniMaxUrlValues(input.reference_audio, '独立参考音频'),
+    ],
+    '独立参考音频',
+    MINIMAX_H3_MAX_AUDIOS,
+  )
+
+  if (input.mode !== undefined && input.mode !== 'first_last_frame') {
+    throw new Error('MiniMax-H3 的 mode 仅支持 first_last_frame')
+  }
+  if (input.mode === 'first_last_frame') {
+    if (images.length !== 2) throw new Error('MiniMax-H3 的首尾帧模式必须恰好提供两张参考图片')
+    if (referenceVideos.length || referenceVideoAudios.length || referenceAudios.length) {
+      throw new Error('MiniMax-H3 的首尾帧模式不能同时使用参考视频或参考音频')
+    }
+  }
+
+  const payload: Record<string, unknown> = {
     model: input.model.trim(),
     prompt: input.prompt,
-    seconds: input.seconds,
-    size: input.size,
-    audio: input.audio,
   }
-  if (input.images.length > 0) payload.images = [...input.images]
+  if (hasDuration || !hasSeconds) payload.duration = normalizedDuration
+  else payload.seconds = normalizedDuration
+  if (size) payload.size = size
+  if (input.mode) payload.mode = input.mode
+  if (input.audio !== undefined) payload.audio = input.audio
+  if (promptEnhance !== undefined) payload.prompt_enhance = promptEnhance
+  if (resolution !== undefined) payload.resolution = resolution
+  if (clarity !== undefined) payload.clarity = clarity
+  if (aspectRatio !== undefined) payload.aspect_ratio = aspectRatio
+  if (normalizedMegapixels !== undefined) payload.megapixels = normalizedMegapixels
+  if (images.length > 0) payload.images = images
+  if (referenceVideos.length > 0) payload.reference_videos = referenceVideos
+  if (referenceVideoAudios.length > 0) payload.reference_video_audios = referenceVideoAudios
+  if (referenceAudios.length > 0) payload.reference_audios = referenceAudios
+  if (normalizedMultiple !== undefined) payload.metadata = { multiple: normalizedMultiple }
   return payload
 }
 
