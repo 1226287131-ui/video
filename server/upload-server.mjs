@@ -262,6 +262,7 @@ async function handleAsset(req, res, id) {
       'Content-Disposition': 'inline',
       'X-Content-Type-Options': 'nosniff',
     })
+    if (req.method === 'HEAD') return res.end()
     await pipeline(fs.createReadStream(filePath), res)
   } catch (error) {
     if (!res.headersSent) json(res, error.code === 'ENOENT' ? 404 : 500, { error: 'not found' })
@@ -351,7 +352,7 @@ const server = http.createServer(async (req, res) => {
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/api/video-proxy') {
       return await handleVideoProxy(req, res, url.searchParams.get('url') || '')
     }
-    if (req.method === 'GET' && url.pathname.startsWith('/api/uploads/')) {
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/api/uploads/')) {
       return await handleAsset(req, res, decodeURIComponent(url.pathname.slice('/api/uploads/'.length)))
     }
     return json(res, 404, { error: 'not found' })
