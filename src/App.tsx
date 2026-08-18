@@ -1735,11 +1735,8 @@ function App() {
   }
 
   function removeHistoryItem(taskId: string) {
-    const targetTask = history.find((item) => item.task_id === taskId)
-    if (targetTask && isActiveTaskStatus(targetTask.status)) {
-      setMessage('该任务仍在生成，完成后才能删除记录')
-      return
-    }
+    // 删除的是本地历史记录，不会取消上游任务。先停止轮询，避免异步回调把记录重新写回历史。
+    stopPolling(taskId)
     const nextHistory = sortHistoryRecords(history.filter((item) => item.task_id !== taskId))
     setHistory(nextHistory)
     if (nextHistory.length > 0) {
@@ -1757,10 +1754,11 @@ function App() {
   }
 
   function clearHistory() {
-    if (activeTasks.length > 0 || submitting) {
-      setMessage('仍有任务正在生成，全部结束后才能清空历史记录')
+    if (submitting) {
+      setMessage('仍有任务正在提交，请稍后再清空历史记录')
       return
     }
+    // 清空历史同样只影响本地记录；停止轮询后，远端任务不会再次写回已清空的历史。
     clearAllPolling()
     setHistory([])
     setSelectedTaskId(null)
@@ -2748,8 +2746,8 @@ function App() {
                   type="button"
                   className="history-clear-btn"
                   onClick={clearHistory}
-                  disabled={activeTasks.length > 0 || submitting}
-                  title={activeTasks.length > 0 || submitting ? '仍有任务生成中，暂不可清空' : '清空历史记录'}
+                  disabled={submitting}
+                  title={submitting ? '仍有任务提交中，暂不可清空' : '清空历史记录'}
                 >
                   <Trash2 size={15} /> 清空
                 </button>
@@ -2850,9 +2848,8 @@ function App() {
                             type="button"
                             className="inline-btn danger-btn"
                             onClick={() => removeHistoryItem(item.task_id)}
-                            disabled={isActiveTaskStatus(item.status)}
-                            aria-label={isActiveTaskStatus(item.status) ? '该任务生成中，暂不可删除' : '删除历史记录'}
-                            title={isActiveTaskStatus(item.status) ? '该任务生成中，暂不可删除' : '删除历史记录'}
+                            aria-label="删除历史记录"
+                            title="删除历史记录"
                           >
                             <Trash2 size={15} />
                           </button>
