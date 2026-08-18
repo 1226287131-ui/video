@@ -87,6 +87,86 @@ export const MINIMAX_H3_DEFAULT_SECONDS = 5
 export const MINIMAX_H3_MIN_MULTIPLE = 8
 export const MINIMAX_H3_MAX_MULTIPLE = 128
 
+export type MiniMaxH3MediaMentionCounts = {
+  images: number
+  videos: number
+  audios: number
+}
+
+export type MiniMaxH3MentionResult = {
+  prompt: string
+  invalidTokens: string[]
+  valid: boolean
+}
+
+const MINIMAX_H3_MEDIA_MENTION_PATTERN = /(?<![A-Za-z0-9._%+-])[@＠](Image|Video|Audio|参考图|参考视频|视频|参考音频|音频)(\d+)(?![A-Za-z0-9_]|\.[A-Za-z0-9_])/giu
+
+const MINIMAX_H3_MEDIA_ALIASES: Record<string, { kind: keyof MiniMaxH3MediaMentionCounts, label: string }> = {
+  image: { kind: 'images', label: '张参考图' },
+  '参考图': { kind: 'images', label: '张参考图' },
+  video: { kind: 'videos', label: '个参考视频' },
+  '参考视频': { kind: 'videos', label: '个参考视频' },
+  '视频': { kind: 'videos', label: '个参考视频' },
+  audio: { kind: 'audios', label: '个参考音频' },
+  '参考音频': { kind: 'audios', label: '个参考音频' },
+  '音频': { kind: 'audios', label: '个参考音频' },
+}
+
+function safeMentionCount(value: number) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0
+}
+
+/** Compile UI media mentions into explicit array-order instructions for H3's JSON contract. */
+export function normalizeMiniMaxH3Mentions(
+  prompt: string,
+  counts: MiniMaxH3MediaMentionCounts,
+): MiniMaxH3MentionResult {
+  const invalidTokens: string[] = []
+  const safeCounts = {
+    images: safeMentionCount(counts.images),
+    videos: safeMentionCount(counts.videos),
+    audios: safeMentionCount(counts.audios),
+  }
+  const referenced = new Map<keyof MiniMaxH3MediaMentionCounts, number[]>()
+  const normalizedPrompt = prompt.replace(
+    MINIMAX_H3_MEDIA_MENTION_PATTERN,
+    (token, rawAlias: string, rawNumber: string) => {
+      const media = MINIMAX_H3_MEDIA_ALIASES[rawAlias.toLowerCase()]
+      const mediaNumber = Number(rawNumber)
+      const inRange = media && Number.isSafeInteger(mediaNumber) && mediaNumber >= 1 && mediaNumber <= safeCounts[media.kind] && rawNumber === String(mediaNumber)
+      if (!inRange) {
+        if (!invalidTokens.includes(token)) invalidTokens.push(token)
+        return token
+      }
+      const numbers = referenced.get(media.kind) ?? []
+      if (!numbers.includes(mediaNumber)) numbers.push(mediaNumber)
+      referenced.set(media.kind, numbers)
+      return `第${mediaNumber}${media.label}`
+    },
+  )
+
+  if (invalidTokens.length > 0 || referenced.size === 0) {
+    return { prompt, invalidTokens, valid: invalidTokens.length === 0 }
+  }
+
+  const mappings: string[] = []
+  const mappingLabels: Record<keyof MiniMaxH3MediaMentionCounts, string> = {
+    images: 'images',
+    videos: 'reference_videos',
+    audios: 'reference_audios',
+  }
+  for (const [kind, numbers] of referenced) {
+    for (const number of numbers) {
+      mappings.push(`${mappingLabels[kind]}[${number - 1}] 是第${number}${MINIMAX_H3_MEDIA_ALIASES[kind === 'images' ? '参考图' : kind === 'videos' ? '参考视频' : '参考音频'].label}`)
+    }
+  }
+  return {
+    prompt: `参考素材严格按传入数组顺序编号：${mappings.join('；')}。请按这些编号理解下方指令，不要混淆不同参考素材。\n\n${normalizedPrompt}`,
+    invalidTokens,
+    valid: true,
+  }
+}
+
 export function isMiniMaxH3VideoModel(model: unknown) {
   const normalized = String(model || '').trim().toLowerCase()
   return MINIMAX_H3_VIDEO_MODELS.some((candidate) => candidate.toLowerCase() === normalized)

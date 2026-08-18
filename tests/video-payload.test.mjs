@@ -12,6 +12,7 @@ import {
   MINIMAX_H3_MAX_VIDEOS,
   MINIMAX_H3_VIDEO_SIZES,
   isMiniMaxH3VideoModel,
+  normalizeMiniMaxH3Mentions,
   isValidMiniMaxH3AspectRatio,
   isValidMiniMaxH3Multiple,
   isValidMiniMaxH3VideoSeconds,
@@ -24,6 +25,24 @@ const form = {
   ratio: '16:9',
   quality: 'hd',
 }
+
+test('compiles MiniMax-H3 media mentions into explicit array-order instructions', () => {
+  const result = normalizeMiniMaxH3Mentions(
+    '让 @参考图2 的人物沿着 @参考视频1 的动作前进，并保留 @参考音频1 的节奏。',
+    { images: 2, videos: 1, audios: 1 },
+  )
+
+  assert.equal(result.valid, true)
+  assert.deepEqual(result.invalidTokens, [])
+  assert.match(result.prompt, /images\[1\].*第2张参考图/u)
+  assert.match(result.prompt, /reference_videos\[0\].*第1个参考视频/u)
+  assert.match(result.prompt, /reference_audios\[0\].*第1个参考音频/u)
+  assert.doesNotMatch(result.prompt, /@参考图2|@参考视频1|@参考音频1/u)
+
+  const invalid = normalizeMiniMaxH3Mentions('@参考图3', { images: 2, videos: 0, audios: 0 })
+  assert.equal(invalid.valid, false)
+  assert.deepEqual(invalid.invalidTokens, ['@参考图3'])
+})
 
 test('multiple-image payload preserves reference order and compiled mention mapping', () => {
   const urls = Object.freeze(['https://example.com/one.jpg', 'https://example.com/two.jpg'])

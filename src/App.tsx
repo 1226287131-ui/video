@@ -80,6 +80,7 @@ import {
   MINIMAX_H3_DEFAULT_SECONDS,
   isValidMiniMaxH3VideoSeconds,
   isValidMiniMaxH3VideoSize,
+  normalizeMiniMaxH3Mentions,
   type MiniMaxH3AspectRatio,
   type MiniMaxH3VideoSize,
 } from './minimaxH3'
@@ -765,7 +766,7 @@ function App() {
     currentUploadedImages.length > 0 || uploadedAudios.length > 0 || uploadedVideoAudios.length > 0 || uploadedVideos.length > 0 || imageUrls.some((value) => value.trim())
   )
   const referencePreviewItems = configuredReferenceItems.filter((item) => isHttpUrl(item.url))
-  const mentionOptions = activeMention && !grokModelSelected && !miniMaxModelSelected
+  const mentionOptions = activeMention && !grokModelSelected
     ? referencePreviewItems.filter((item) => `参考图${item.number}`.startsWith(activeMention.query))
     : []
   const mentionMenuOpen = mode === 'image' && !referenceEditingLocked && Boolean(activeMention) && mentionOptions.length > 0
@@ -816,7 +817,7 @@ function App() {
       })
       setImageInputMode('multiple')
       setImageSourceMode('upload')
-      setMessage(`MiniMax-H3-933-1440P-GF 使用 /v1/videos：支持 ${MINIMAX_H3_MIN_SECONDS}-${MINIMAX_H3_MAX_SECONDS} 秒、${MINIMAX_H3_MAX_IMAGES} 图、${MINIMAX_H3_MAX_VIDEOS} 视频、${MINIMAX_H3_MAX_VIDEO_AUDIOS} 个视频配套音频和 ${MINIMAX_H3_MAX_AUDIOS} 个独立参考音频`)
+      setMessage(`MiniMax-H3-933-1440P-GF 使用 /v1/videos：支持 ${MINIMAX_H3_MIN_SECONDS}-${MINIMAX_H3_MAX_SECONDS} 秒、${MINIMAX_H3_MAX_IMAGES} 图、${MINIMAX_H3_MAX_VIDEOS} 视频和 ${MINIMAX_H3_MAX_AUDIOS} 个独立参考音频`)
       return
     }
 
@@ -1528,7 +1529,9 @@ function App() {
     const textarea = promptRef.current
     const selectionStart = textarea?.selectionStart ?? form.prompt.length
     const selectionEnd = textarea?.selectionEnd ?? selectionStart
-    const token = `@${videoV2MediaConfig[kind].token}${referenceNumber}`
+    const token = miniMaxModelSelected
+      ? `@${kind === 'image' ? '参考图' : kind === 'video' ? '参考视频' : '参考音频'}${referenceNumber}`
+      : `@${videoV2MediaConfig[kind].token}${referenceNumber}`
     const before = form.prompt.slice(0, selectionStart)
     const after = form.prompt.slice(selectionEnd)
     const leadingSpace = before && !/[\s（(，,。.!！？?：:；;]$/.test(before) ? ' ' : ''
@@ -2057,8 +2060,8 @@ function App() {
         setMessage(`MiniMax-H3-933-1440P-GF 最多支持 ${MAX_MINIMAX_IMAGES} 张参考图，请移除多余图片`)
         return
       }
-      if (uploadedAudios.length > MINIMAX_H3_MAX_AUDIOS || uploadedVideoAudios.length > MINIMAX_H3_MAX_VIDEO_AUDIOS || uploadedVideos.length > MINIMAX_H3_MAX_VIDEOS) {
-        setMessage(`MiniMax-H3-933-1440P-GF 最多支持 ${MAX_MINIMAX_IMAGES} 图、${MINIMAX_H3_MAX_VIDEOS} 视频、${MINIMAX_H3_MAX_VIDEO_AUDIOS} 个视频配套音频和 ${MINIMAX_H3_MAX_AUDIOS} 个独立参考音频`)
+      if (uploadedAudios.length > MINIMAX_H3_MAX_AUDIOS || uploadedVideos.length > MINIMAX_H3_MAX_VIDEOS) {
+        setMessage(`MiniMax-H3-933-1440P-GF 最多支持 ${MAX_MINIMAX_IMAGES} 图、${MINIMAX_H3_MAX_VIDEOS} 视频和 ${MINIMAX_H3_MAX_AUDIOS} 个独立参考音频`)
         return
       }
     }
@@ -2170,7 +2173,7 @@ function App() {
     }
 
     if (useMiniMaxApi) {
-      const miniMaxTotalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoAudioUrls.length + referenceVideoUrls.length
+      const miniMaxTotalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoUrls.length
       if (submissionMode === 'image' && miniMaxTotalReferences === 0) {
         setMessage('MiniMax-H3-933-1440P-GF 的参考素材模式至少需要上传一张图片、一个视频或一个音频')
         return
@@ -2178,7 +2181,6 @@ function App() {
       const allMiniMaxUrls = [
         ...referenceUrls,
         ...referenceAudioUrls,
-        ...referenceVideoAudioUrls,
         ...referenceVideoUrls,
       ]
       const invalidReferenceIndex = allMiniMaxUrls.findIndex((url) => !isHttpUrl(url))
@@ -2186,6 +2188,17 @@ function App() {
         setMessage('参考素材外链无效，请重新上传对应文件')
         return
       }
+      const mentionCompilation = normalizeMiniMaxH3Mentions(rawPrompt, {
+        images: referenceUrls.length,
+        videos: referenceVideoUrls.length,
+        audios: referenceAudioUrls.length,
+      })
+      if (!mentionCompilation.valid) {
+        setMessage(`${mentionCompilation.invalidTokens.join('、')} 没有对应 H3 参考素材，请检查编号`)
+        promptRef.current?.focus()
+        return
+      }
+      submittedPrompt = mentionCompilation.prompt
     } else if (useVideoResourceApi) {
       if (useVideoV2Fallback) {
         if (formSnapshot.duration !== 15) {
@@ -2283,7 +2296,6 @@ function App() {
             size: formSnapshot.size,
             images: referenceUrls,
             referenceVideos: referenceVideoUrls,
-            referenceVideoAudios: referenceVideoAudioUrls,
             referenceAudios: referenceAudioUrls,
           })
       : useVideoV3Api
@@ -2555,18 +2567,16 @@ function App() {
                   <span className="video-v2-media-type" aria-hidden="true"><Icon size={15} /></span>
                 )}
                 <span className="video-v2-media-name" title={asset.name || asset.id}>{asset.name || asset.id}</span>
-                {!miniMaxModelSelected && (
-                  <button
+                <button
                     type="button"
                     className="video-v2-mention-btn"
                     onClick={() => insertVideoV2MediaMention(kind, index + 1)}
                     disabled={referenceEditingLocked}
-                    aria-label={`在 Prompt 中插入 @${config.token}${index + 1}`}
-                    title={`插入 @${config.token}${index + 1}`}
+                    aria-label={`在 Prompt 中插入 ${miniMaxModelSelected ? `@${kind === 'image' ? '参考图' : kind === 'video' ? '参考视频' : '参考音频'}${index + 1}` : `@${config.token}${index + 1}`}`}
+                    title={`插入 ${miniMaxModelSelected ? `@${kind === 'image' ? '参考图' : kind === 'video' ? '参考视频' : '参考音频'}${index + 1}` : `@${config.token}${index + 1}`}`}
                   >
-                    <AtSign size={13} aria-hidden="true" />{config.token}{index + 1}
-                  </button>
-                )}
+                    <AtSign size={13} aria-hidden="true" />{miniMaxModelSelected ? (kind === 'image' ? '参考图' : kind === 'video' ? '参考视频' : '参考音频') : config.token}{index + 1}
+                </button>
                 <button
                   type="button"
                   className="video-v2-remove-btn"
@@ -2920,14 +2930,14 @@ function App() {
                     <strong>参考素材</strong>
                     <span>提交时会以公网外链发送给当前模型的 JSON 协议</span>
                   </div>
-                  <span className="badge">{videoV2MediaLimits.images} 图 · {videoV2MediaLimits.videos} 视频 · {miniMaxModelSelected ? `${MINIMAX_H3_MAX_VIDEO_AUDIOS} 个视频配套音频 · ${MINIMAX_H3_MAX_AUDIOS} 个独立音频` : `${videoV2MediaLimits.audios} 音频`}</span>
+                  <span className="badge">{videoV2MediaLimits.images} 图 · {videoV2MediaLimits.videos} 视频 · {videoV2MediaLimits.audios} 音频</span>
                 </div>
                 <div className="video-v2-media-grid">
-                  {(['image', 'video', 'audio', ...(miniMaxModelSelected ? ['video-audio'] : [])] as V2MediaKind[]).map(renderVideoV2MediaSection)}
+                  {(['image', 'video', 'audio'] as V2MediaKind[]).map(renderVideoV2MediaSection)}
                 </div>
                 <div className="field-hint">
                   {miniMaxModelSelected
-                    ? 'MiniMax-H3 会按 images、reference_videos、reference_video_audios、reference_audios 字段提交；相同 URL 或文件名会自动去重，不使用 @Image/@Audio 引用。'
+                    ? 'MiniMax-H3 会按 images、reference_videos、reference_audios 字段提交；可点击每个素材旁的 @ 按钮，把 @参考图、@参考视频 或 @参考音频写入 Prompt。'
                     : videoV3ModelSelected
                     ? 'SD2.5 仅有图片时以 images 外链数组提交；存在参考视频或音频时，会按文档改用 content[] 中的 image_url、video_url、audio_url。图片最多 30 张，视频和音频各最多 10 个。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
