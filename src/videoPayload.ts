@@ -12,13 +12,15 @@ import {
   type MiniMaxH3VideoSize,
 } from './minimaxH3.ts'
 import {
-  isValidVideoV3Duration,
-  isValidVideoV3GridStrength,
-  isValidVideoV3Ratio,
-  isValidVideoV3Resolution,
+  isValidVideoV3DurationForProtocol,
+  isValidVideoV3GridStrengthForProtocol,
+  isValidVideoV3RatioForProtocol,
+  isValidVideoV3ResolutionForProtocol,
   isVideoV3Model,
   VIDEO_V3_MEDIA_LIMITS,
   VIDEO_V3_DEFAULT_RESOLUTION,
+  VIDEO_V3_QY_DEFAULT_RESOLUTION,
+  type VideoV3Protocol,
   type VideoV3Resolution,
   type VideoV3Ratio,
 } from './videoV3.ts'
@@ -97,6 +99,8 @@ export type VideoV3SubmitPayloadInput = {
   videos: readonly string[]
   audios: readonly string[]
   generateAudio: boolean
+  /** Original SD2.5 wire contract, or the QY top-level media contract. */
+  protocol?: VideoV3Protocol
   resolution?: VideoV3Resolution
   size?: string
   startFrameUrl?: string
@@ -123,7 +127,16 @@ type VideoV3PayloadBase = {
   grid_strength?: number
 }
 
-export type VideoV3SubmitPayload = VideoV3PayloadBase & { prompt: string }
+export type VideoV3ContentItem =
+  | { type: 'text', text: string }
+  | { type: 'image_url', image_url: { url: string } }
+  | { type: 'video_url', video_url: { url: string } }
+  | { type: 'audio_url', audio_url: { url: string } }
+
+export type VideoV3SubmitPayload = VideoV3PayloadBase & (
+  | { prompt: string }
+  | { content: VideoV3ContentItem[] }
+)
 
 function normalizeUrls(urls: readonly string[], label: string, limit: number) {
   const normalized = urls.map((url) => {
@@ -204,12 +217,24 @@ function normalizeOptionalMiniMaxString(value: unknown, wireKey: string) {
 export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
   if (!isVideoV3Model(input.model)) throw new Error('SD2.5 视频表单只能用于 video-v3 系列模型')
   if (!input.prompt.trim()) throw new Error('Prompt 不能为空')
-  if (!isValidVideoV3Duration(input.duration)) throw new Error('video-v3 的 duration 必须是 4 到 29 之间的整数')
-  if (!isValidVideoV3Ratio(input.ratio)) throw new Error('video-v3 不支持该画幅')
+  const protocol = input.protocol ?? 'legacy'
+  if (protocol !== 'legacy' && protocol !== 'qy') throw new Error('video-v3 的协议类型无效')
+  if (!isValidVideoV3DurationForProtocol(input.duration, protocol)) {
+    throw new Error(protocol === 'qy'
+      ? 'QY 协议的 duration 必须是 4 到 29 之间的整数'
+      : '原协议的 duration 必须是 4 到 30 之间的整数')
+  }
+  if (!isValidVideoV3RatioForProtocol(input.ratio, protocol)) {
+    throw new Error(protocol === 'qy' ? 'QY 协议不支持该画幅' : 'video-v3 不支持该画幅')
+  }
   if (typeof input.generateAudio !== 'boolean') throw new Error('video-v3 的 generate_audio 必须是布尔值')
 
-  const resolution = input.resolution ?? VIDEO_V3_DEFAULT_RESOLUTION
-  if (!isValidVideoV3Resolution(resolution)) throw new Error('video-v3 的 resolution 仅支持 480p 或 720p')
+  const resolution = input.resolution ?? (protocol === 'qy' ? VIDEO_V3_QY_DEFAULT_RESOLUTION : VIDEO_V3_DEFAULT_RESOLUTION)
+  if (!isValidVideoV3ResolutionForProtocol(resolution, protocol)) {
+    throw new Error(protocol === 'qy'
+      ? 'QY 协议的 resolution 仅支持 480p 或 720p'
+      : '原协议的 resolution 固定为 720p')
+  }
 
   const normalizeOptionalUrl = (value: unknown, label: string) => {
     if (value === undefined) return undefined
@@ -225,7 +250,10 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
     return normalized
   }
   const size = input.size === undefined ? undefined : String(input.size).trim()
-  if (size !== undefined && size && !/^\d+x\d+$/i.test(size)) throw new Error('video-v3 的 size 必须是宽x高格式，例如 1280x720')
+  if (protocol === 'legacy' && (size || input.startFrameUrl?.trim() || input.endFrameUrl?.trim())) {
+    throw new Error('原 video-v3 协议不支持 size、start_frame_url 或 end_frame_url，请切换到 QY 协议')
+  }
+  if (size !== undefined && size && !/^\d+x\d+$/i.test(size)) throw new Error('QY 协议的 size 必须是宽x高格式，例如 1280x720')
   const startFrameUrl = normalizeOptionalUrl(input.startFrameUrl, 'start_frame_url')
   const endFrameUrl = normalizeOptionalUrl(input.endFrameUrl, 'end_frame_url')
 
@@ -234,13 +262,16 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
   const audios = normalizeUrls(input.audios, '音频参考', VIDEO_V3_MEDIA_LIMITS.audios)
 
   if (input.seed !== undefined && input.seed !== '') {
-    if (!Number.isSafeInteger(input.seed) || input.seed < 0 || input.seed > 4294967295) throw new Error('video-v3 的 seed 必须是 0 到 4294967295 之间的整数')
+    const seedIsValid = protocol === 'qy'
+      ? Number.isSafeInteger(input.seed) && input.seed >= 0 && input.seed <= 4294967295
+      : Number.isSafeInteger(input.seed)
+    if (!seedIsValid) throw new Error(protocol === 'qy' ? 'QY 协议的 seed 必须是 0 到 4294967295 之间的整数' : 'video-v3 的 seed 必须是整数')
   }
   if (input.bypassFaceCheck !== undefined && typeof input.bypassFaceCheck !== 'boolean') {
     throw new Error('video-v3 的 bypass_face_check 必须是布尔值')
   }
-  if (input.gridStrength !== undefined && input.gridStrength !== '' && !isValidVideoV3GridStrength(input.gridStrength)) {
-    throw new Error('video-v3 的 grid_strength 必须在 0.01 到 0.5 之间')
+  if (input.gridStrength !== undefined && input.gridStrength !== '' && !isValidVideoV3GridStrengthForProtocol(input.gridStrength, protocol)) {
+    throw new Error(protocol === 'qy' ? 'QY 协议的 grid_strength 必须在 0.01 到 0.5 之间' : 'video-v3 的 grid_strength 必须在 0 到 1 之间')
   }
 
   const payloadBase: VideoV3PayloadBase = {
@@ -250,15 +281,25 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
     resolution,
     generate_audio: input.generateAudio,
   }
-  if (size) payloadBase.size = size
-  if (startFrameUrl) payloadBase.start_frame_url = startFrameUrl
-  if (endFrameUrl) payloadBase.end_frame_url = endFrameUrl
+  if (protocol === 'qy' && size) payloadBase.size = size
+  if (protocol === 'qy' && startFrameUrl) payloadBase.start_frame_url = startFrameUrl
+  if (protocol === 'qy' && endFrameUrl) payloadBase.end_frame_url = endFrameUrl
   if ((startFrameUrl || endFrameUrl) && images.length > 0) {
     throw new Error('video-v3 的 start_frame_url/end_frame_url 不能与图片参考同时使用')
   }
   if (input.seed !== undefined && input.seed !== '') payloadBase.seed = input.seed
   if (input.bypassFaceCheck !== undefined) payloadBase.bypass_face_check = input.bypassFaceCheck
   if (input.gridStrength !== undefined && input.gridStrength !== '') payloadBase.grid_strength = input.gridStrength
+
+  if (protocol === 'legacy' && (videos.length > 0 || audios.length > 0)) {
+    const content: VideoV3ContentItem[] = [
+      { type: 'text', text: input.prompt },
+      ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+      ...videos.map((url) => ({ type: 'video_url' as const, video_url: { url } })),
+      ...audios.map((url) => ({ type: 'audio_url' as const, audio_url: { url } })),
+    ]
+    return { ...payloadBase, content }
+  }
 
   const payload: VideoV3SubmitPayload = { ...payloadBase, prompt: input.prompt }
   if (images.length > 0) payload.images = images

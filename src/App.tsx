@@ -51,6 +51,7 @@ import {
   runWithConcurrency,
 } from './taskWorkflow'
 import { buildMiniMaxH3SubmitPayload, buildVideoSubmitPayload, buildVideoV2SubmitPayload, buildVideoV3SubmitPayload } from './videoPayload'
+import { parseCreatedVideoTask } from './videoResponse'
 import {
   createGrokVideoFormData,
   GROK_MULTI_REFERENCE_VIDEO_RESOLUTIONS,
@@ -85,15 +86,19 @@ import {
   type MiniMaxH3VideoSize,
 } from './minimaxH3'
 import {
-  isValidVideoV3Duration,
-  isValidVideoV3GridStrength,
-  isValidVideoV3Ratio,
+  isValidVideoV3DurationForProtocol,
+  isValidVideoV3GridStrengthForProtocol,
+  isValidVideoV3RatioForProtocol,
   VIDEO_V3_MAX_DURATION,
   VIDEO_V3_MEDIA_LIMITS,
   VIDEO_V3_MIN_DURATION,
   VIDEO_V3_RATIOS,
   VIDEO_V3_DEFAULT_RESOLUTION,
+  VIDEO_V3_QY_DEFAULT_RESOLUTION,
+  VIDEO_V3_QY_MAX_DURATION,
+  VIDEO_V3_QY_RATIOS,
   VIDEO_V3_RESOLUTIONS,
+  type VideoV3Protocol,
 } from './videoV3'
 import {
   getVideoV2MediaLimits,
@@ -150,6 +155,7 @@ type TaskStatus =
 type TaskRecord = {
   id: string
   task_id: string
+  task_status_path?: string
   object: 'video'
   model: string
   status: TaskStatus | string
@@ -173,6 +179,7 @@ type TaskRecord = {
   seed?: number
   bypass_face_check?: boolean
   grid_strength?: number
+  video_v3_protocol?: VideoV3Protocol
   prompt?: string
   submitted_prompt?: string
   reference_count?: number
@@ -206,9 +213,14 @@ type FormState = {
   seed: number | ''
   bypassFaceCheck: boolean
   gridStrength: number | ''
+  videoV3Protocol: VideoV3Protocol
   startFrameUrl: string
   endFrameUrl: string
   model: string
+}
+
+function getTaskStatusPath(task: Pick<TaskRecord, 'model' | 'task_id' | 'task_status_path'>) {
+  return task.task_status_path || getVideoTaskPath(task.model, task.task_id)
 }
 
 type ModelInfo = {
@@ -309,6 +321,7 @@ const initialForm: FormState = {
   seed: '',
   bypassFaceCheck: false,
   gridStrength: '',
+  videoV3Protocol: 'legacy',
   startFrameUrl: '',
   endFrameUrl: '',
   model: 'video-v1' // 模型列表加载前的临时值；加载后会自动校验。
@@ -338,6 +351,11 @@ const videoV3DurationPresets: VideoDuration[] = Array.from(
   (_, index) => index + VIDEO_V3_MIN_DURATION,
 )
 const videoV3RatioPresets: VideoRatio[] = [...VIDEO_V3_RATIOS]
+const videoV3QyDurationPresets: VideoDuration[] = Array.from(
+  { length: VIDEO_V3_QY_MAX_DURATION - VIDEO_V3_MIN_DURATION + 1 },
+  (_, index) => index + VIDEO_V3_MIN_DURATION,
+)
+const videoV3QyRatioPresets: VideoRatio[] = [...VIDEO_V3_QY_RATIOS]
 const grokRatioPresets: VideoRatio[] = ['16:9', '9:16', '1:1', '4:3', '3:4', '2:3', '3:2']
 const videoV2FallbackRatioPresets: VideoRatio[] = ['16:9', '9:16']
 const qualityPresets: VideoQuality[] = ['hd', 'sd']
@@ -538,7 +556,7 @@ function App() {
       maxItems: getVideoV2MediaLimit(kind),
       ...(kind === 'image' ? videoV2ImageSizeLimit : {}),
     }
-    if (!videoV3ModelSelected) return config
+    if (!videoV3ModelSelected || form.videoV3Protocol !== 'qy') return config
     if (kind === 'audio') {
       return {
         ...config,
@@ -614,6 +632,7 @@ function App() {
         videoV3Size: parsed.video_v3_size ?? current.videoV3Size,
         startFrameUrl: parsed.start_frame_url ?? current.startFrameUrl,
         endFrameUrl: parsed.end_frame_url ?? current.endFrameUrl,
+        videoV3Protocol: parsed.video_v3_protocol ?? current.videoV3Protocol,
         generateAudio: parsed.generate_audio ?? current.generateAudio,
         seed: parsed.seed ?? current.seed,
         bypassFaceCheck: parsed.bypass_face_check ?? current.bypassFaceCheck,
@@ -755,14 +774,14 @@ function App() {
   const selectedTaskUsesProtectedContent = Boolean(task && getVideoContentPath(task.model, task.task_id) && !task.result_url)
   const resultHref = selectedTaskUsesProtectedContent ? grokVideoObjectUrl : resolveVideoHref(task?.result_url)
   const visibleDurationPresets = videoV3ModelSelected
-    ? videoV3DurationPresets
+    ? form.videoV3Protocol === 'qy' ? videoV3QyDurationPresets : videoV3DurationPresets
     : grokModelSelected
     ? grokDurationPresets
     : videoV2FallbackModelSelected
       ? videoV2FallbackDurationPresets
       : durationPresets
   const visibleRatioPresets = videoV3ModelSelected
-    ? videoV3RatioPresets
+    ? form.videoV3Protocol === 'qy' ? videoV3QyRatioPresets : videoV3RatioPresets
     : grokModelSelected
     ? grokRatioPresets
     : videoV2FallbackModelSelected
@@ -843,6 +862,36 @@ function App() {
     })
   }
 
+  function changeVideoV3Protocol(nextProtocol: VideoV3Protocol) {
+    setForm((current) => {
+      if (current.videoV3Protocol === nextProtocol) return current
+      const isQy = nextProtocol === 'qy'
+      const duration = isQy
+        ? Math.min(current.duration, VIDEO_V3_QY_MAX_DURATION)
+        : current.duration
+      const ratio = isQy && !isValidVideoV3RatioForProtocol(current.ratio, 'qy')
+        ? '16:9'
+        : current.ratio
+      const resolution = isQy
+        ? (current.resolution === '720p' ? '720p' : VIDEO_V3_QY_DEFAULT_RESOLUTION)
+        : VIDEO_V3_DEFAULT_RESOLUTION
+      const gridStrength = isQy && current.gridStrength !== '' && !isValidVideoV3GridStrengthForProtocol(current.gridStrength, 'qy')
+        ? ''
+        : current.gridStrength
+      return {
+        ...current,
+        videoV3Protocol: nextProtocol,
+        duration,
+        ratio,
+        resolution,
+        gridStrength,
+        videoV3Size: isQy ? current.videoV3Size : '',
+        startFrameUrl: isQy ? current.startFrameUrl : '',
+        endFrameUrl: isQy ? current.endFrameUrl : '',
+      }
+    })
+  }
+
   const changeModel = useCallback((nextModel: string) => {
     if (isMiniMaxH3VideoModel(nextModel)) {
       setForm((current) => {
@@ -878,10 +927,11 @@ function App() {
         quality: 'hd',
         resolution: VIDEO_V3_DEFAULT_RESOLUTION,
         generateAudio: true,
+        videoV3Protocol: 'legacy',
       }))
       setImageInputMode('multiple')
       setImageSourceMode('upload')
-      setMessage(`SD2.5 / ${nextModel} 支持 4-29 秒、480p/720p、${VIDEO_V3_MEDIA_LIMITS.images} 图 · ${VIDEO_V3_MEDIA_LIMITS.videos} 视频 · ${VIDEO_V3_MEDIA_LIMITS.audios} 音频参考`)
+      setMessage(`SD2.5 / ${nextModel} 默认保留原协议：4-30 秒、720p；也可切换 QY 协议使用 480p/720p 与扩展参数`)
       return
     }
 
@@ -1186,7 +1236,7 @@ function App() {
   async function refreshTaskResult(item: TaskRecord, key: string) {
     try {
       const protectedContentTask = Boolean(getVideoContentPath(item.model, item.task_id))
-      const response = await fetch(`${API_BASE_URL}${getVideoTaskPath(item.model, item.task_id)}`, {
+      const response = await fetch(`${API_BASE_URL}${getTaskStatusPath(item)}`, {
         headers: { Authorization: `Bearer ${key}` },
       })
       if (!response.ok) return
@@ -1763,6 +1813,7 @@ function App() {
         videoV3Size: item.video_v3_size ?? current.videoV3Size,
         startFrameUrl: item.start_frame_url ?? current.startFrameUrl,
         endFrameUrl: item.end_frame_url ?? current.endFrameUrl,
+        videoV3Protocol: item.video_v3_protocol ?? current.videoV3Protocol,
         generateAudio: item.generate_audio ?? current.generateAudio,
         seed: item.seed ?? current.seed,
         bypassFaceCheck: item.bypass_face_check ?? current.bypassFaceCheck,
@@ -1860,7 +1911,7 @@ function App() {
       poller.timeoutId = null
       try {
         const protectedContentTask = Boolean(getVideoContentPath(pollingTask.model, taskId))
-        const res = await fetch(`${API_BASE_URL}${getVideoTaskPath(pollingTask.model, taskId)}`, {
+        const res = await fetch(`${API_BASE_URL}${getTaskStatusPath(pollingTask)}`, {
           headers: apiKeyRef.current ? { Authorization: `Bearer ${apiKeyRef.current}` } : {},
         })
         if (!res.ok) throw new PollingHttpError(res.status)
@@ -2197,32 +2248,40 @@ function App() {
     }
 
     if (useVideoV3Api) {
-      if (!isValidVideoV3Duration(formSnapshot.duration)) {
-        setMessage('video-v3 的时长必须是 4 到 29 秒之间的整数')
+      const v3Protocol = formSnapshot.videoV3Protocol
+      const v3MaxDuration = v3Protocol === 'qy' ? VIDEO_V3_QY_MAX_DURATION : VIDEO_V3_MAX_DURATION
+      if (!isValidVideoV3DurationForProtocol(formSnapshot.duration, v3Protocol)) {
+        setMessage(`${v3Protocol === 'qy' ? 'QY' : '原'} video-v3 协议的时长必须是 ${VIDEO_V3_MIN_DURATION} 到 ${v3MaxDuration} 秒之间的整数`)
         setShowSettings(true)
         return
       }
-      if (!isValidVideoV3Ratio(formSnapshot.ratio)) {
-        setMessage('video-v3 仅支持 16:9、1:1 或 9:16 画幅')
+      if (!isValidVideoV3RatioForProtocol(formSnapshot.ratio, v3Protocol)) {
+        setMessage(v3Protocol === 'qy' ? 'QY 协议仅支持 16:9、1:1 或 9:16 画幅' : '原 video-v3 协议不支持该画幅')
         setShowSettings(true)
         return
       }
-      if (formSnapshot.seed !== '' && (!Number.isSafeInteger(formSnapshot.seed) || formSnapshot.seed < 0 || formSnapshot.seed > 4294967295)) {
-        setMessage('video-v3 的 seed 必须是 0 到 4294967295 之间的整数，留空则由上游随机生成')
+      const invalidSeed = formSnapshot.seed !== '' && (
+        !Number.isSafeInteger(formSnapshot.seed) ||
+        (v3Protocol === 'qy' && (formSnapshot.seed < 0 || formSnapshot.seed > 4294967295))
+      )
+      if (invalidSeed) {
+        setMessage(v3Protocol === 'qy' ? 'QY 协议的 seed 必须是 0 到 4294967295 之间的整数，留空则由上游随机生成' : '原 video-v3 协议的 seed 必须是整数，留空则由上游随机生成')
         setShowSettings(true)
         return
       }
-      if (formSnapshot.gridStrength !== '' && !isValidVideoV3GridStrength(formSnapshot.gridStrength)) {
-        setMessage('video-v3 的 grid_strength 必须在 0.01 到 0.5 之间')
+      if (formSnapshot.gridStrength !== '' && !isValidVideoV3GridStrengthForProtocol(formSnapshot.gridStrength, v3Protocol)) {
+        setMessage(v3Protocol === 'qy' ? 'QY 协议的 grid_strength 必须在 0.01 到 0.5 之间' : '原 video-v3 协议的 grid_strength 必须在 0 到 1 之间')
         setShowSettings(true)
         return
       }
-      if (formSnapshot.videoV3Size.trim() && !/^\d+x\d+$/i.test(formSnapshot.videoV3Size.trim())) {
+      if (v3Protocol === 'qy' && formSnapshot.videoV3Size.trim() && !/^\d+x\d+$/i.test(formSnapshot.videoV3Size.trim())) {
         setMessage('video-v3 的 size 必须是宽x高格式，例如 1280x720')
         setShowSettings(true)
         return
       }
-      const frameUrls = [formSnapshot.startFrameUrl.trim(), formSnapshot.endFrameUrl.trim()].filter(Boolean)
+      const frameUrls = v3Protocol === 'qy'
+        ? [formSnapshot.startFrameUrl.trim(), formSnapshot.endFrameUrl.trim()].filter(Boolean)
+        : []
       if (frameUrls.some((url) => !isHttpUrl(url))) {
         setMessage('video-v3 的首帧和尾帧必须是公网 http/https URL')
         setShowSettings(true)
@@ -2276,7 +2335,7 @@ function App() {
         }
       }
       const totalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoUrls.length + (
-        useVideoV3Api && (formSnapshot.startFrameUrl.trim() || formSnapshot.endFrameUrl.trim()) ? 1 : 0
+        useVideoV3Api && formSnapshot.videoV3Protocol === 'qy' && (formSnapshot.startFrameUrl.trim() || formSnapshot.endFrameUrl.trim()) ? 1 : 0
       )
       if (submissionMode === 'image' && totalReferences === 0) {
         setMessage('参考素材模式至少需要上传一张图片、一个音频或一个视频')
@@ -2373,6 +2432,7 @@ function App() {
             videos: referenceVideoUrls,
             audios: referenceAudioUrls,
             generateAudio: formSnapshot.generateAudio,
+            protocol: formSnapshot.videoV3Protocol,
             resolution: formSnapshot.resolution === '720p' ? '720p' : '480p',
             size: formSnapshot.videoV3Size,
             startFrameUrl: formSnapshot.startFrameUrl,
@@ -2468,14 +2528,16 @@ function App() {
         } catch {
           throw new SubmissionStateUnknownError('服务端已响应成功，但响应内容无法识别', plan.idempotencyKey, plan.index + 1)
         }
-        const rawData = json?.data ?? json
-        const data = Array.isArray(rawData) ? rawData[0] : rawData
-        const rawTaskId = data?.task_id || data?.id || json?.task_id || json?.id
-        if (!rawTaskId) {
+        const createdTask = parseCreatedVideoTask(json)
+        if (json?.code === 'fail_to_fetch_task') {
+          const taskReference = createdTask ? `（网关返回的临时任务 ${createdTask.taskId} 不可查询）` : ''
+          throw new Error(`video-v3 上游任务创建失败：网关未能获取任务${taskReference}。请检查 api.kkone.vip 的 video-v3 映射和上游账户状态`)
+        }
+        if (!createdTask) {
           throw new SubmissionStateUnknownError('服务端已响应成功，但未返回 task_id', plan.idempotencyKey, plan.index + 1)
         }
-        const taskId = String(rawTaskId)
-        const responseStatus = String(data?.status || json?.status || 'queued').toLowerCase()
+        const taskId = createdTask.taskId
+        const responseStatus = createdTask.status
         const initialStatus: TaskStatus = ['success', 'succeeded', 'completed'].includes(responseStatus)
           ? 'succeeded'
           : ['failed', 'failure'].includes(responseStatus)
@@ -2483,14 +2545,12 @@ function App() {
             : ['processing', 'in_progress'].includes(responseStatus)
               ? 'processing'
               : 'queued'
-        const resultUrl = data?.result_url || data?.video_url || data?.url || data?.metadata?.url || json?.result_url || json?.url || json?.metadata?.url
-        const rawInitialProgress = Number(data?.progress ?? json?.progress ?? 0)
-        const initialProgress = Number.isFinite(rawInitialProgress)
-          ? Math.min(100, Math.max(0, rawInitialProgress))
-          : 0
+        const resultUrl = createdTask.resultUrl
+        const initialProgress = createdTask.progress
         const newTask: TaskRecord = {
-          id: data?.id || taskId,
+          id: createdTask.id,
           task_id: taskId,
+          task_status_path: createdTask.statusPath,
           object: 'video',
           model: formSnapshot.model,
           status: resultUrl ? 'succeeded' : initialStatus,
@@ -2506,6 +2566,7 @@ function App() {
           video_v3_size: useVideoV3Api ? formSnapshot.videoV3Size.trim() || undefined : undefined,
           start_frame_url: useVideoV3Api ? formSnapshot.startFrameUrl.trim() || undefined : undefined,
           end_frame_url: useVideoV3Api ? formSnapshot.endFrameUrl.trim() || undefined : undefined,
+          video_v3_protocol: useVideoV3Api ? formSnapshot.videoV3Protocol : undefined,
           seed: useVideoV3Api && formSnapshot.seed !== '' ? formSnapshot.seed : undefined,
           bypass_face_check: useVideoV3Api ? formSnapshot.bypassFaceCheck : undefined,
           grid_strength: useVideoV3Api && formSnapshot.gridStrength !== '' ? formSnapshot.gridStrength : undefined,
@@ -2526,8 +2587,8 @@ function App() {
           batch_total: requestedCount,
           idempotency_key: plan.idempotencyKey,
           result_url: resultUrl,
-          preview_url: data?.preview_url || data?.thumbnail_url || data?.cover_url || data?.poster_url,
-          message: data?.message || json?.message,
+          preview_url: createdTask.previewUrl,
+          message: createdTask.message,
         }
 
         persistTask(newTask)
@@ -3007,7 +3068,9 @@ function App() {
                   {miniMaxModelSelected
                     ? 'MiniMax-H3 会按 images、reference_videos、reference_audios 字段提交；可点击每个素材旁的 @ 按钮，把 @参考图、@参考视频 或 @参考音频写入 Prompt。'
                     : videoV3ModelSelected
-                    ? 'SD2.5 会以顶层 prompt、images、videos、audios 外链数组提交。图片最多 30 张，视频和音频各最多 10 个；首尾帧 URL 不能与图片参考同时使用。'
+                    ? form.videoV3Protocol === 'qy'
+                      ? 'QY 兼容协议会以顶层 prompt、images、videos、audios 外链数组提交；首尾帧 URL 不能与图片参考同时使用。'
+                      : '原 V3 协议保留 4-30 秒、原画幅与 720p；存在参考视频或音频时会按 content[] 中的 image_url、video_url、audio_url 提交。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
                 </div>
               </div>
@@ -3477,7 +3540,7 @@ function App() {
                         }}
                         aria-label="video-v3 渲染时长"
                       />
-                      <span>秒（{VIDEO_V3_MIN_DURATION}-{VIDEO_V3_MAX_DURATION}）</span>
+                      <span>秒（{VIDEO_V3_MIN_DURATION}-{form.videoV3Protocol === 'qy' ? VIDEO_V3_QY_MAX_DURATION : VIDEO_V3_MAX_DURATION}）</span>
                     </label>
                   ) : (
                     <div className="segmented">
@@ -3543,20 +3606,42 @@ function App() {
                 ) : videoV3ModelSelected ? (
                   <>
                     <div className="options-group" style={{ marginTop: 8 }}>
-                      <span className="options-group-label"><Settings2 size={14} /> 输出清晰度</span>
+                      <span className="options-group-label"><Settings2 size={14} /> 请求协议</span>
                       <div className="segmented">
-                        {VIDEO_V3_RESOLUTIONS.map((value) => (
-                          <button
-                            type="button"
-                            key={value}
-                            className={`segmented-item ${form.resolution === value ? 'is-active' : ''}`}
-                            onClick={() => updateField('resolution', value)}
-                          >
-                            {value}
-                          </button>
-                        ))}
+                        <button
+                          type="button"
+                          className={`segmented-item ${form.videoV3Protocol === 'legacy' ? 'is-active' : ''}`}
+                          onClick={() => changeVideoV3Protocol('legacy')}
+                        >
+                          原 V3 协议
+                        </button>
+                        <button
+                          type="button"
+                          className={`segmented-item ${form.videoV3Protocol === 'qy' ? 'is-active' : ''}`}
+                          onClick={() => changeVideoV3Protocol('qy')}
+                        >
+                          QY 兼容协议
+                        </button>
                       </div>
                     </div>
+                    <div className="options-group" style={{ marginTop: 8 }}>
+                      <span className="options-group-label"><Settings2 size={14} /> 输出清晰度</span>
+                      {form.videoV3Protocol === 'qy' ? (
+                        <div className="segmented">
+                          {VIDEO_V3_RESOLUTIONS.map((value) => (
+                            <button
+                              type="button"
+                              key={value}
+                              className={`segmented-item ${form.resolution === value ? 'is-active' : ''}`}
+                              onClick={() => updateField('resolution', value)}
+                            >
+                              {value}
+                            </button>
+                          ))}
+                        </div>
+                      ) : <span className="badge">固定 {VIDEO_V3_DEFAULT_RESOLUTION}</span>}
+                    </div>
+                    {form.videoV3Protocol === 'qy' && <>
                     <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
                       <label className="options-group-label" htmlFor="video-v3-size"><Settings2 size={14} /> 输出尺寸（可选）</label>
                       <input
@@ -3588,6 +3673,7 @@ function App() {
                       />
                       <span className="field-hint">首尾帧 URL 不能与参考图片同时使用，可与参考视频或音频组合。</span>
                     </div>
+                    </>}
                     <div className="options-group" style={{ marginTop: 8 }}>
                       <span className="options-group-label"><Settings2 size={14} /> 生成音频</span>
                       <div className="segmented">
@@ -3624,13 +3710,13 @@ function App() {
                       <input
                         id="video-v3-grid-strength"
                         type="number"
-                        min="0.01"
-                        max="0.5"
-                        step="0.01"
+                        min={form.videoV3Protocol === 'qy' ? '0.01' : '0'}
+                        max={form.videoV3Protocol === 'qy' ? '0.5' : '1'}
+                        step={form.videoV3Protocol === 'qy' ? '0.01' : '0.05'}
                         inputMode="decimal"
                         value={form.gridStrength}
                         onChange={(event) => updateField('gridStrength', event.target.value === '' ? '' : Number(event.target.value))}
-                        placeholder="0.01-0.5"
+                        placeholder={form.videoV3Protocol === 'qy' ? '0.01-0.5' : '0-1'}
                       />
                     </div>
                     <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
