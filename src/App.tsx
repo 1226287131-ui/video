@@ -92,7 +92,8 @@ import {
   VIDEO_V3_MEDIA_LIMITS,
   VIDEO_V3_MIN_DURATION,
   VIDEO_V3_RATIOS,
-  VIDEO_V3_RESOLUTION,
+  VIDEO_V3_DEFAULT_RESOLUTION,
+  VIDEO_V3_RESOLUTIONS,
 } from './videoV3'
 import {
   getVideoV2MediaLimits,
@@ -161,6 +162,9 @@ type TaskRecord = {
   generate_audio?: boolean
   seconds?: number
   size?: VideoSize
+  video_v3_size?: string
+  start_frame_url?: string
+  end_frame_url?: string
   audio?: boolean
   prompt_enhance?: boolean
   clarity?: string
@@ -197,10 +201,13 @@ type FormState = {
   quality: VideoQuality
   resolution: VideoResolution
   size: VideoSize
+  videoV3Size: string
   generateAudio: boolean
   seed: number | ''
   bypassFaceCheck: boolean
   gridStrength: number | ''
+  startFrameUrl: string
+  endFrameUrl: string
   model: string
 }
 
@@ -260,12 +267,18 @@ const MAX_GROK_REFERENCE_FILE_MB = 20
 const MAX_GROK_REFERENCE_FILE_BYTES = MAX_GROK_REFERENCE_FILE_MB * 1024 * 1024
 const MAX_VIDEO_V2_IMAGE_MB = 15
 const MAX_VIDEO_V2_IMAGE_BYTES = MAX_VIDEO_V2_IMAGE_MB * 1024 * 1024
-const MAX_VIDEO_V3_IMAGE_MB = 20
+const MAX_MINIMAX_IMAGE_MB = 20
+const MAX_MINIMAX_IMAGE_BYTES = MAX_MINIMAX_IMAGE_MB * 1024 * 1024
+const MAX_VIDEO_V3_IMAGE_MB = 30
 const MAX_VIDEO_V3_IMAGE_BYTES = MAX_VIDEO_V3_IMAGE_MB * 1024 * 1024
 const MAX_REFERENCE_AUDIO_MB = 16
 const MAX_REFERENCE_AUDIO_BYTES = MAX_REFERENCE_AUDIO_MB * 1024 * 1024
 const MAX_REFERENCE_VIDEO_MB = 48
 const MAX_REFERENCE_VIDEO_BYTES = MAX_REFERENCE_VIDEO_MB * 1024 * 1024
+const MAX_VIDEO_V3_AUDIO_MB = 15
+const MAX_VIDEO_V3_AUDIO_BYTES = MAX_VIDEO_V3_AUDIO_MB * 1024 * 1024
+const MAX_VIDEO_V3_VIDEO_MB = 200
+const MAX_VIDEO_V3_VIDEO_BYTES = MAX_VIDEO_V3_VIDEO_MB * 1024 * 1024
 const MAX_POLL_ERRORS = 12
 const MAX_RESULT_WAIT_POLLS = 30
 const VIDEO_PROXY_HOST_SUFFIXES = ['.douyin.com', '.douyinvod.com', '.byteimg.com', '.ibytedtos.com']
@@ -274,7 +287,7 @@ const VIDEO_V2_15MB_IMAGE_MODELS = new Set(['video-v2', 'video-v2-fast'])
 function getVideoV2ImageSizeLimit(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
   if (isMiniMaxH3VideoModel(normalizedModel)) {
-    return { maxMegabytes: MAX_VIDEO_V3_IMAGE_MB, maxBytes: MAX_VIDEO_V3_IMAGE_BYTES }
+    return { maxMegabytes: MAX_MINIMAX_IMAGE_MB, maxBytes: MAX_MINIMAX_IMAGE_BYTES }
   }
   if (isVideoV3Model(normalizedModel)) {
     return { maxMegabytes: MAX_VIDEO_V3_IMAGE_MB, maxBytes: MAX_VIDEO_V3_IMAGE_BYTES }
@@ -291,10 +304,13 @@ const initialForm: FormState = {
   quality: 'hd',
   resolution: '480p',
   size: MINIMAX_H3_DEFAULT_SIZE,
+  videoV3Size: '',
   generateAudio: true,
   seed: '',
   bypassFaceCheck: false,
   gridStrength: '',
+  startFrameUrl: '',
+  endFrameUrl: '',
   model: 'video-v1' // 模型列表加载前的临时值；加载后会自动校验。
 }
 
@@ -516,6 +532,35 @@ function App() {
           ? videoV2MediaLimits.videos
           : miniMaxModelSelected ? MINIMAX_H3_MAX_VIDEO_AUDIOS : 0
   )
+  const getVideoV2MediaUploadConfig = (kind: V2MediaKind) => {
+    const config = {
+      ...videoV2MediaConfig[kind],
+      maxItems: getVideoV2MediaLimit(kind),
+      ...(kind === 'image' ? videoV2ImageSizeLimit : {}),
+    }
+    if (!videoV3ModelSelected) return config
+    if (kind === 'audio') {
+      return {
+        ...config,
+        accept: '.mp3,.wav,audio/mpeg,audio/mp3,audio/wav,audio/x-wav',
+        mimeTypes: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav'],
+        formats: 'MP3 / WAV',
+        maxMegabytes: MAX_VIDEO_V3_AUDIO_MB,
+        maxBytes: MAX_VIDEO_V3_AUDIO_BYTES,
+      }
+    }
+    if (kind === 'video') {
+      return {
+        ...config,
+        accept: '.mp4,.mov,video/mp4,video/quicktime',
+        mimeTypes: ['video/mp4', 'video/quicktime'],
+        formats: 'MP4 / MOV',
+        maxMegabytes: MAX_VIDEO_V3_VIDEO_MB,
+        maxBytes: MAX_VIDEO_V3_VIDEO_BYTES,
+      }
+    }
+    return config
+  }
   const playbackTaskId = task?.task_id || ''
   const playbackTaskModel = task?.model || ''
   const playbackTaskStatus = String(task?.status || '').toLowerCase()
@@ -566,6 +611,9 @@ function App() {
         quality: parsed.quality ?? current.quality,
         resolution: parsed.resolution ?? current.resolution,
         size: parsed.size ?? current.size,
+        videoV3Size: parsed.video_v3_size ?? current.videoV3Size,
+        startFrameUrl: parsed.start_frame_url ?? current.startFrameUrl,
+        endFrameUrl: parsed.end_frame_url ?? current.endFrameUrl,
         generateAudio: parsed.generate_audio ?? current.generateAudio,
         seed: parsed.seed ?? current.seed,
         bypassFaceCheck: parsed.bypass_face_check ?? current.bypassFaceCheck,
@@ -825,15 +873,15 @@ function App() {
       setForm((current) => ({
         ...current,
         model: nextModel,
-        duration: isValidVideoV3Duration(current.duration) ? current.duration : VIDEO_V3_MIN_DURATION,
-        ratio: isValidVideoV3Ratio(current.ratio) ? current.ratio : '16:9',
+        duration: VIDEO_V3_MIN_DURATION,
+        ratio: '16:9',
         quality: 'hd',
-        resolution: VIDEO_V3_RESOLUTION,
-        generateAudio: current.generateAudio,
+        resolution: VIDEO_V3_DEFAULT_RESOLUTION,
+        generateAudio: true,
       }))
       setImageInputMode('multiple')
       setImageSourceMode('upload')
-      setMessage(`SD2.5 / ${nextModel} 支持 4-30 秒、固定 720p、${VIDEO_V3_MEDIA_LIMITS.images} 图 · ${VIDEO_V3_MEDIA_LIMITS.videos} 视频 · ${VIDEO_V3_MEDIA_LIMITS.audios} 音频参考`)
+      setMessage(`SD2.5 / ${nextModel} 支持 4-29 秒、480p/720p、${VIDEO_V3_MEDIA_LIMITS.images} 图 · ${VIDEO_V3_MEDIA_LIMITS.videos} 视频 · ${VIDEO_V3_MEDIA_LIMITS.audios} 音频参考`)
       return
     }
 
@@ -1422,11 +1470,7 @@ function App() {
 
     const selected = Array.from(files || [])
     if (selected.length === 0) return
-    const config = {
-      ...videoV2MediaConfig[kind],
-      maxItems: getVideoV2MediaLimit(kind),
-      ...(kind === 'image' ? videoV2ImageSizeLimit : {}),
-    }
+    const config = getVideoV2MediaUploadConfig(kind)
     const normalizedFiles = selected.map((file) => {
       const currentType = file.type.toLowerCase()
       if ((config.mimeTypes as readonly string[]).includes(currentType)) return file
@@ -1716,6 +1760,9 @@ function App() {
         quality: item.quality ?? current.quality,
         resolution: item.resolution ?? current.resolution,
         size: item.size ?? current.size,
+        videoV3Size: item.video_v3_size ?? current.videoV3Size,
+        startFrameUrl: item.start_frame_url ?? current.startFrameUrl,
+        endFrameUrl: item.end_frame_url ?? current.endFrameUrl,
         generateAudio: item.generate_audio ?? current.generateAudio,
         seed: item.seed ?? current.seed,
         bypassFaceCheck: item.bypass_face_check ?? current.bypassFaceCheck,
@@ -2151,22 +2198,38 @@ function App() {
 
     if (useVideoV3Api) {
       if (!isValidVideoV3Duration(formSnapshot.duration)) {
-        setMessage('video-v3 的时长必须是 4 到 30 秒之间的整数')
+        setMessage('video-v3 的时长必须是 4 到 29 秒之间的整数')
         setShowSettings(true)
         return
       }
       if (!isValidVideoV3Ratio(formSnapshot.ratio)) {
-        setMessage('video-v3 仅支持 auto、21:9、16:9、4:3、1:1、3:4 或 9:16 画幅')
+        setMessage('video-v3 仅支持 16:9、1:1 或 9:16 画幅')
         setShowSettings(true)
         return
       }
-      if (formSnapshot.seed !== '' && !Number.isSafeInteger(formSnapshot.seed)) {
-        setMessage('video-v3 的 seed 必须是整数，留空则由上游随机生成')
+      if (formSnapshot.seed !== '' && (!Number.isSafeInteger(formSnapshot.seed) || formSnapshot.seed < 0 || formSnapshot.seed > 4294967295)) {
+        setMessage('video-v3 的 seed 必须是 0 到 4294967295 之间的整数，留空则由上游随机生成')
         setShowSettings(true)
         return
       }
       if (formSnapshot.gridStrength !== '' && !isValidVideoV3GridStrength(formSnapshot.gridStrength)) {
-        setMessage('video-v3 的 grid_strength 必须在 0 到 1 之间')
+        setMessage('video-v3 的 grid_strength 必须在 0.01 到 0.5 之间')
+        setShowSettings(true)
+        return
+      }
+      if (formSnapshot.videoV3Size.trim() && !/^\d+x\d+$/i.test(formSnapshot.videoV3Size.trim())) {
+        setMessage('video-v3 的 size 必须是宽x高格式，例如 1280x720')
+        setShowSettings(true)
+        return
+      }
+      const frameUrls = [formSnapshot.startFrameUrl.trim(), formSnapshot.endFrameUrl.trim()].filter(Boolean)
+      if (frameUrls.some((url) => !isHttpUrl(url))) {
+        setMessage('video-v3 的首帧和尾帧必须是公网 http/https URL')
+        setShowSettings(true)
+        return
+      }
+      if (frameUrls.length > 0 && referenceUrls.length > 0) {
+        setMessage('video-v3 的首帧或尾帧不能与参考图片同时使用，请移除其中一项')
         setShowSettings(true)
         return
       }
@@ -2212,7 +2275,9 @@ function App() {
           return
         }
       }
-      const totalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoUrls.length
+      const totalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoUrls.length + (
+        useVideoV3Api && (formSnapshot.startFrameUrl.trim() || formSnapshot.endFrameUrl.trim()) ? 1 : 0
+      )
       if (submissionMode === 'image' && totalReferences === 0) {
         setMessage('参考素材模式至少需要上传一张图片、一个音频或一个视频')
         return
@@ -2308,6 +2373,10 @@ function App() {
             videos: referenceVideoUrls,
             audios: referenceAudioUrls,
             generateAudio: formSnapshot.generateAudio,
+            resolution: formSnapshot.resolution === '720p' ? '720p' : '480p',
+            size: formSnapshot.videoV3Size,
+            startFrameUrl: formSnapshot.startFrameUrl,
+            endFrameUrl: formSnapshot.endFrameUrl,
             seed: formSnapshot.seed,
             bypassFaceCheck: formSnapshot.bypassFaceCheck,
             gridStrength: formSnapshot.gridStrength,
@@ -2431,9 +2500,12 @@ function App() {
           seconds: useMiniMaxApi ? formSnapshot.duration : undefined,
           ratio: formSnapshot.ratio,
           quality: formSnapshot.quality,
-          resolution: useGrokApi ? formSnapshot.resolution : useVideoV2Fallback ? '720p' : useVideoV3Api ? VIDEO_V3_RESOLUTION : useVideoV2Api ? formSnapshot.resolution : undefined,
+          resolution: useGrokApi ? formSnapshot.resolution : useVideoV2Fallback ? '720p' : useVideoV3Api ? formSnapshot.resolution : useVideoV2Api ? formSnapshot.resolution : undefined,
           generate_audio: useVideoV2Fallback ? false : useVideoResourceApi ? formSnapshot.generateAudio : undefined,
           size: useMiniMaxApi ? formSnapshot.size : undefined,
+          video_v3_size: useVideoV3Api ? formSnapshot.videoV3Size.trim() || undefined : undefined,
+          start_frame_url: useVideoV3Api ? formSnapshot.startFrameUrl.trim() || undefined : undefined,
+          end_frame_url: useVideoV3Api ? formSnapshot.endFrameUrl.trim() || undefined : undefined,
           seed: useVideoV3Api && formSnapshot.seed !== '' ? formSnapshot.seed : undefined,
           bypass_face_check: useVideoV3Api ? formSnapshot.bypassFaceCheck : undefined,
           grid_strength: useVideoV3Api && formSnapshot.gridStrength !== '' ? formSnapshot.gridStrength : undefined,
@@ -2502,11 +2574,7 @@ function App() {
   }
 
   function renderVideoV2MediaSection(kind: V2MediaKind) {
-    const config = {
-      ...videoV2MediaConfig[kind],
-      maxItems: getVideoV2MediaLimit(kind),
-      ...(kind === 'image' ? videoV2ImageSizeLimit : {}),
-    }
+    const config = getVideoV2MediaUploadConfig(kind)
     const assets = getVideoV2Assets(kind)
     const Icon = kind === 'image' ? Images : kind === 'video' || kind === 'video-audio' ? (kind === 'video-audio' ? FileMusic : FileVideoCamera) : FileMusic
     const isUploading = uploadingMediaKind === kind
@@ -2939,7 +3007,7 @@ function App() {
                   {miniMaxModelSelected
                     ? 'MiniMax-H3 会按 images、reference_videos、reference_audios 字段提交；可点击每个素材旁的 @ 按钮，把 @参考图、@参考视频 或 @参考音频写入 Prompt。'
                     : videoV3ModelSelected
-                    ? 'SD2.5 仅有图片时以 images 外链数组提交；存在参考视频或音频时，会按文档改用 content[] 中的 image_url、video_url、audio_url。图片最多 30 张，视频和音频各最多 10 个。'
+                    ? 'SD2.5 会以顶层 prompt、images、videos、audios 外链数组提交。图片最多 30 张，视频和音频各最多 10 个；首尾帧 URL 不能与图片参考同时使用。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
                 </div>
               </div>
@@ -3476,7 +3544,49 @@ function App() {
                   <>
                     <div className="options-group" style={{ marginTop: 8 }}>
                       <span className="options-group-label"><Settings2 size={14} /> 输出清晰度</span>
-                      <span className="badge">固定 {VIDEO_V3_RESOLUTION}</span>
+                      <div className="segmented">
+                        {VIDEO_V3_RESOLUTIONS.map((value) => (
+                          <button
+                            type="button"
+                            key={value}
+                            className={`segmented-item ${form.resolution === value ? 'is-active' : ''}`}
+                            onClick={() => updateField('resolution', value)}
+                          >
+                            {value}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
+                      <label className="options-group-label" htmlFor="video-v3-size"><Settings2 size={14} /> 输出尺寸（可选）</label>
+                      <input
+                        id="video-v3-size"
+                        type="text"
+                        value={form.videoV3Size}
+                        onChange={(event) => updateField('videoV3Size', event.target.value)}
+                        placeholder="例如 1280x720"
+                      />
+                    </div>
+                    <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
+                      <label className="options-group-label" htmlFor="video-v3-start-frame"><Settings2 size={14} /> 首帧 URL（可选）</label>
+                      <input
+                        id="video-v3-start-frame"
+                        type="url"
+                        value={form.startFrameUrl}
+                        onChange={(event) => updateField('startFrameUrl', event.target.value)}
+                        placeholder="https://..."
+                      />
+                    </div>
+                    <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
+                      <label className="options-group-label" htmlFor="video-v3-end-frame"><Settings2 size={14} /> 尾帧 URL（可选）</label>
+                      <input
+                        id="video-v3-end-frame"
+                        type="url"
+                        value={form.endFrameUrl}
+                        onChange={(event) => updateField('endFrameUrl', event.target.value)}
+                        placeholder="https://..."
+                      />
+                      <span className="field-hint">首尾帧 URL 不能与参考图片同时使用，可与参考视频或音频组合。</span>
                     </div>
                     <div className="options-group" style={{ marginTop: 8 }}>
                       <span className="options-group-label"><Settings2 size={14} /> 生成音频</span>
@@ -3514,13 +3624,13 @@ function App() {
                       <input
                         id="video-v3-grid-strength"
                         type="number"
-                        min="0"
-                        max="1"
-                        step="0.05"
+                        min="0.01"
+                        max="0.5"
+                        step="0.01"
                         inputMode="decimal"
                         value={form.gridStrength}
                         onChange={(event) => updateField('gridStrength', event.target.value === '' ? '' : Number(event.target.value))}
-                        placeholder="0-1"
+                        placeholder="0.01-0.5"
                       />
                     </div>
                     <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>

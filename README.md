@@ -29,7 +29,7 @@ npm run build
 
 `MiniMax-H3-933-1440P-GF` 使用 `/v1/videos` 异步接口。网页请求只发送 `model`、`prompt`、`seconds`（4-15 秒）、`size` 和已选择的参考素材；`audio`、`prompt_enhance`、`clarity`、`megapixels`、`metadata.multiple` 等高级字段一律省略，由上游使用默认值。参考素材使用公网 URL：`images` 最多 9 张、`reference_videos` 最多 3 个、`reference_audios` 最多 3 个；相同 URL 或文件名会去重。H3 Prompt 支持 `@参考图1`、`@参考视频1`、`@参考音频1`，提交前会将其编译为对应数组下标的明确说明。前端会先把用户上传的文件暂存到项目域名，过期后由上传服务自动清理，不把视频文件落到站点目录。
 
-`video-v3`、`seedance-2.5`、`seedance2.5`、`sd-2.5`、`sd2.5` 会按 SD2.5 OpenAI Video 协议使用 `/v1/videos` 创建和查询任务。纯文生和仅参考图片时，前端提交顶层 `prompt`、`images`（最多 30）、`duration`（4-30 的整数）、`ratio`（`auto`、`21:9`、`16:9`、`4:3`、`1:1`、`3:4`、`9:16`）、固定 `resolution: "720p"`、`generate_audio`、`seed`、`bypass_face_check`、`grid_strength`。只要存在参考视频（最多 10）或参考音频（最多 10），前端会改为文档规定的 `content` 数组：一个 `text` 项，以及对应的 `image_url`、`video_url`、`audio_url` 项；此时不混发顶层 `prompt`、`images`、`videos` 或 `audios`。参考文件会先经项目域名转为临时公网 URL；同类重复 URL 会在提交前去重。
+`video-v3`、`seedance-2.5`、`seedance2.5`、`sd-2.5`、`sd2.5` 会按 SD2.5 OpenAI Video 协议使用 `/v1/videos` 创建和查询任务。前端始终提交顶层 `prompt`，并按需附带 `images`（最多 30）、`videos`（最多 10）、`audios`（最多 10）、`duration`（4-29 的整数）、`ratio`（`16:9`、`1:1`、`9:16`）、`resolution`（默认 `480p`，可选 `720p`）、`generate_audio`、`seed`（0-4294967295）、`bypass_face_check`、`grid_strength`（0.01-0.5）、`size`、`start_frame_url`、`end_frame_url`。首帧或尾帧 URL 不能与图片参考同时提交，但可与参考视频或音频组合。参考文件会先经项目域名转为临时公网 URL；同类重复 URL 会在提交前去重。
 
 前端只负责提交任务、轮询状态和播放远程视频。Grok 图生视频只接受本地上传的真实图片文件，最多 7 张；只有在当前 Grok 模型下上传的文件会进入其 `input_reference` 字段，其他模型残留的素材不会被带入。同一个临时上传 ID 即使意外出现在素材列表多次，也只会进入请求体一次。两张及以上参考图时，本站页面仅允许选择 `480p` 或 `720p`，单图和文生视频仍可选择 `1080p`。参考图数量、文件格式和请求体大小以实际渠道返回为准。Grok 的 `/content` 接口需要 Bearer 鉴权，因此视频会临时加载到当前浏览器会话，不会落到本站服务器磁盘。
 真正的视频文件应由上游或对象存储托管，站点只保存链接，不保存 mp4 到你的服务器磁盘。

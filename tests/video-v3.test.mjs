@@ -12,8 +12,10 @@ import {
   isValidVideoV3Duration,
   isValidVideoV3GridStrength,
   isValidVideoV3Ratio,
+  isValidVideoV3Resolution,
   VIDEO_V3_MEDIA_LIMITS,
   VIDEO_V3_RATIOS,
+  VIDEO_V3_RESOLUTIONS,
   VIDEO_V3_RESOLUTION,
 } from '../src/videoV3.ts'
 
@@ -28,15 +30,18 @@ test('recognizes every documented SD2.5 model alias and routes it through /v1/vi
   assert.equal(isVideoV3Model('video-v2'), false)
 })
 
-test('validates the documented SD2.5 durations, ratios, and optional grid strength', () => {
-  for (const duration of [4, 10, 30, '12']) assert.equal(isValidVideoV3Duration(duration), true)
-  for (const duration of [3, 31, 4.5, '', 'abc']) assert.equal(isValidVideoV3Duration(duration), false)
+test('validates the documented SD2.5 durations, ratios, resolution, and optional grid strength', () => {
+  for (const duration of [4, 10, 29, '12']) assert.equal(isValidVideoV3Duration(duration), true)
+  for (const duration of [3, 30, 31, 4.5, '', 'abc']) assert.equal(isValidVideoV3Duration(duration), false)
 
   for (const ratio of VIDEO_V3_RATIOS) assert.equal(isValidVideoV3Ratio(ratio), true)
-  assert.equal(isValidVideoV3Ratio('2:3'), false)
+  for (const ratio of ['auto', '21:9', '4:3', '3:4', '2:3']) assert.equal(isValidVideoV3Ratio(ratio), false)
 
-  for (const strength of [0, 0.6, 1]) assert.equal(isValidVideoV3GridStrength(strength), true)
-  for (const strength of [-0.01, 1.01, Number.NaN]) assert.equal(isValidVideoV3GridStrength(strength), false)
+  for (const resolution of VIDEO_V3_RESOLUTIONS) assert.equal(isValidVideoV3Resolution(resolution), true)
+  assert.equal(isValidVideoV3Resolution('1080p'), false)
+
+  for (const strength of [0.01, 0.2, 0.5]) assert.equal(isValidVideoV3GridStrength(strength), true)
+  for (const strength of [0, 0.001, 0.51, 1, Number.NaN]) assert.equal(isValidVideoV3GridStrength(strength), false)
 })
 
 test('uses documented top-level prompt and images for image-only video-v3 requests', () => {
@@ -51,7 +56,7 @@ test('uses documented top-level prompt and images for image-only video-v3 reques
     generateAudio: true,
     seed: 12345,
     bypassFaceCheck: false,
-    gridStrength: 0.6,
+    gridStrength: 0.2,
   })
 
   assert.equal(payload.model, 'video-v3')
@@ -63,38 +68,39 @@ test('uses documented top-level prompt and images for image-only video-v3 reques
   assert.equal(payload.generate_audio, true)
   assert.equal(payload.seed, 12345)
   assert.equal(payload.bypass_face_check, false)
-  assert.equal(payload.grid_strength, 0.6)
-  for (const unsupportedField of ['seconds', 'aspect_ratio', 'quality', 'size', 'async', 'content', 'input_reference', 'videos', 'audios']) {
+  assert.equal(payload.grid_strength, 0.2)
+  for (const unsupportedField of ['seconds', 'aspect_ratio', 'quality', 'async', 'content', 'input_reference', 'videos', 'audios']) {
     assert.equal(unsupportedField in payload, false)
   }
 })
 
-test('uses documented content audio_url and video_url items for multimedia video-v3 requests', () => {
+test('uses documented top-level media arrays for multimedia video-v3 requests', () => {
   const payload = buildVideoV3SubmitPayload({
     model: 'seedance2.5',
     prompt: '保持人物形象，并使用参考运镜和环境声音。',
     duration: 12,
     ratio: '9:16',
-    images: ['https://cdn.example.com/person.png', 'https://cdn.example.com/person.png'],
+    images: [],
     videos: ['https://cdn.example.com/camera.mp4'],
     audios: ['https://cdn.example.com/ambient.mp3', 'https://cdn.example.com/ambient.mp3'],
     generateAudio: false,
+    resolution: '720p',
+    size: '1280x720',
+    startFrameUrl: 'https://cdn.example.com/start.jpg',
   })
 
   assert.equal(payload.model, 'seedance2.5')
   assert.equal(payload.duration, 12)
   assert.equal(payload.ratio, '9:16')
-  assert.equal(payload.resolution, VIDEO_V3_RESOLUTION)
+  assert.equal(payload.resolution, '720p')
+  assert.equal(payload.size, '1280x720')
+  assert.equal(payload.start_frame_url, 'https://cdn.example.com/start.jpg')
   assert.equal(payload.generate_audio, false)
-  assert.deepEqual(payload.content, [
-    { type: 'text', text: '保持人物形象，并使用参考运镜和环境声音。' },
-    { type: 'image_url', image_url: { url: 'https://cdn.example.com/person.png' } },
-    { type: 'video_url', video_url: { url: 'https://cdn.example.com/camera.mp4' } },
-    { type: 'audio_url', audio_url: { url: 'https://cdn.example.com/ambient.mp3' } },
-  ])
-  for (const unsupportedField of ['prompt', 'images', 'videos', 'audios', 'input_reference']) {
-    assert.equal(unsupportedField in payload, false)
-  }
+  assert.equal(payload.prompt, '保持人物形象，并使用参考运镜和环境声音。')
+  assert.equal('images' in payload, false)
+  assert.deepEqual(payload.videos, ['https://cdn.example.com/camera.mp4'])
+  assert.deepEqual(payload.audios, ['https://cdn.example.com/ambient.mp3'])
+  assert.equal('content' in payload, false)
 })
 
 test('omits optional SD2.5 media and passthrough fields when they were not chosen', () => {
@@ -102,7 +108,7 @@ test('omits optional SD2.5 media and passthrough fields when they were not chose
     model: 'seedance-2.5',
     prompt: '城市夜景缓慢推进镜头',
     duration: 4,
-    ratio: 'auto',
+    ratio: '16:9',
     images: [],
     videos: [],
     audios: [],
@@ -113,6 +119,7 @@ test('omits optional SD2.5 media and passthrough fields when they were not chose
   assert.equal('videos' in payload, false)
   assert.equal('audios' in payload, false)
   assert.equal('content' in payload, false)
+  assert.equal(payload.resolution, '480p')
   assert.equal('seed' in payload, false)
   assert.equal('grid_strength' in payload, false)
   assert.equal('bypass_face_check' in payload, false)
@@ -129,8 +136,9 @@ test('rejects invalid SD2.5 values and media limits before a request is sent', (
     audios: [],
     generateAudio: true,
   }
-  assert.throws(() => buildVideoV3SubmitPayload({ ...shared, duration: 31 }), /4 到 30/)
+  assert.throws(() => buildVideoV3SubmitPayload({ ...shared, duration: 30 }), /4 到 29/)
   assert.throws(() => buildVideoV3SubmitPayload({ ...shared, ratio: '2:3' }), /不支持该画幅/)
+  assert.throws(() => buildVideoV3SubmitPayload({ ...shared, resolution: '1080p' }), /resolution/)
   assert.throws(() => buildVideoV3SubmitPayload({
     ...shared,
     images: Array.from({ length: VIDEO_V3_MEDIA_LIMITS.images + 1 }, (_, index) => `https://example.com/${index}.jpg`),
@@ -140,5 +148,8 @@ test('rejects invalid SD2.5 values and media limits before a request is sent', (
     audios: Array.from({ length: VIDEO_V3_MEDIA_LIMITS.audios + 1 }, (_, index) => `https://example.com/${index}.mp3`),
   }), /最多支持 10/)
   assert.throws(() => buildVideoV3SubmitPayload({ ...shared, videos: [''] }), /非空 URL/)
-  assert.throws(() => buildVideoV3SubmitPayload({ ...shared, gridStrength: 1.1 }), /0 到 1/)
+  assert.throws(() => buildVideoV3SubmitPayload({ ...shared, gridStrength: 0 }), /0.01 到 0.5/)
+  assert.throws(() => buildVideoV3SubmitPayload({ ...shared, seed: 4294967296 }), /0 到 4294967295/)
+  assert.throws(() => buildVideoV3SubmitPayload({ ...shared, images: ['https://example.com/a.jpg'], startFrameUrl: 'https://example.com/start.jpg' }), /不能与图片参考/)
+  assert.throws(() => buildVideoV3SubmitPayload({ ...shared, size: '720p' }), /宽x高/)
 })
