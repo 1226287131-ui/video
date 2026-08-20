@@ -1589,6 +1589,64 @@ pre {
   margin-bottom: 6px;
 }
 
+.history-batch-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.history-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 4px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.history-select-all input,
+.history-item-select input {
+  width: 17px;
+  height: 17px;
+  accent-color: #818cf8;
+  cursor: pointer;
+}
+
+.history-select-all input:disabled,
+.history-item-select input:disabled {
+  cursor: not-allowed;
+}
+
+.history-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 7px 12px;
+  border: 1px solid rgba(165, 180, 252, 0.28);
+  border-radius: 10px;
+  color: #c7d2fe;
+  background: rgba(129, 140, 248, 0.1);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+.history-download-btn:hover:not(:disabled),
+.history-download-btn:focus-visible:not(:disabled) {
+  border-color: rgba(165, 180, 252, 0.62);
+  background: rgba(129, 140, 248, 0.2);
+}
+
+.history-download-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .history-search {
   display: flex;
   align-items: center;
@@ -1650,6 +1708,23 @@ pre {
   padding: 10px 4px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   transition: background 0.2s;
+}
+
+.history-item-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 40px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.history-item-select input:disabled {
+  opacity: 0.35;
+}
+
+.history-item.is-selected {
+  background: rgba(129, 140, 248, 0.13);
 }
 
 .history-item:hover,
@@ -2125,6 +2200,10 @@ pre {
   .history-search {
     flex-basis: 100%;
   }
+  .history-batch-actions {
+    flex: 1 1 auto;
+    justify-content: space-between;
+  }
   .history-result-count {
     width: 100%;
     text-align: right;
@@ -2135,8 +2214,18 @@ pre {
     gap: 6px;
   }
   .history-item-main {
-    width: 100%;
+    width: calc(100% - 40px);
+    margin-left: 40px;
     box-sizing: border-box;
+  }
+  .history-item-select {
+    position: absolute;
+    left: 0;
+    top: 8px;
+    z-index: 2;
+  }
+  .history-item {
+    position: relative;
   }
   .history-item-preview {
     flex-basis: 84px;

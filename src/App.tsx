@@ -293,6 +293,7 @@ const MAX_VIDEO_V3_VIDEO_MB = 200
 const MAX_VIDEO_V3_VIDEO_BYTES = MAX_VIDEO_V3_VIDEO_MB * 1024 * 1024
 const MAX_POLL_ERRORS = 12
 const MAX_RESULT_WAIT_POLLS = 30
+const BATCH_DOWNLOAD_DELAY_MS = 250
 const VIDEO_PROXY_HOST_SUFFIXES = ['.douyin.com', '.douyinvod.com', '.byteimg.com', '.ibytedtos.com']
 const VIDEO_V2_15MB_IMAGE_MODELS = new Set(['video-v2', 'video-v2-fast'])
 
@@ -478,10 +479,13 @@ function App() {
   const [loadingModels, setLoadingModels] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [history, setHistory] = useState<TaskRecord[]>([])
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(() => new Set())
   const [uncertainSubmissions, setUncertainSubmissions] = useState<UncertainSubmission[]>([])
   const [message, setMessage] = useState('等待输入 Prompt 构建视频')
   const [submitting, setSubmitting] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [batchDownloading, setBatchDownloading] = useState(false)
+  const [batchDownloadProgress, setBatchDownloadProgress] = useState({ completed: 0, total: 0 })
   const [grokVideoObjectUrl, setGrokVideoObjectUrl] = useState('')
   const [loadingGrokVideo, setLoadingGrokVideo] = useState(false)
   const pollersRef = useRef(new Map<string, {
@@ -844,6 +848,22 @@ function App() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedHistoryQuery)))
     : orderedHistory
+  const isHistoryTaskDownloadable = (item: TaskRecord) => Boolean(
+    String(item.status).toLowerCase() === 'succeeded' && (
+      item.result_url || getVideoContentPath(item.model, item.task_id)
+    ),
+  )
+  const downloadableFilteredHistory = filteredHistory.filter(isHistoryTaskDownloadable)
+  const selectedDownloadableHistory = downloadableFilteredHistory.filter((item) => selectedHistoryIds.has(item.task_id))
+  const allDownloadableFilteredSelected = downloadableFilteredHistory.length > 0 && selectedDownloadableHistory.length === downloadableFilteredHistory.length
+
+  useEffect(() => {
+    setSelectedHistoryIds((current) => {
+      const validIds = new Set(history.map((item) => item.task_id))
+      const next = new Set([...current].filter((id) => validIds.has(id)))
+      return next.size === current.size ? current : next
+    })
+  }, [history])
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -1322,23 +1342,20 @@ function App() {
     }
   }
 
-  async function downloadVideo() {
-    const authenticatedContentPath = task && !task.result_url ? getVideoContentPath(task.model, task.task_id) : ''
-    const downloadHref = authenticatedContentPath ? `${API_BASE_URL}${authenticatedContentPath}` : resultHref
-    if (!downloadHref || downloading) return
-    setDownloading(true)
-    setMessage('正在准备下载视频...')
-    const filename = `video-${task?.task_id || Date.now()}.mp4`
+  async function downloadTaskVideo(item: TaskRecord) {
+    const authenticatedContentPath = !item.result_url ? getVideoContentPath(item.model, item.task_id) : ''
+    const downloadHref = authenticatedContentPath ? `${API_BASE_URL}${authenticatedContentPath}` : resolveVideoHref(item.result_url)
+    if (!downloadHref) return false
+    const filename = `video-${item.task_id || Date.now()}.mp4`
     try {
-      if (authenticatedContentPath && grokVideoObjectUrl) {
+      if (authenticatedContentPath && item.task_id === task?.task_id && grokVideoObjectUrl) {
         const link = document.createElement('a')
         link.href = grokVideoObjectUrl
         link.download = filename
         document.body.appendChild(link)
         link.click()
         link.remove()
-        setMessage('下载已开始')
-        return
+        return true
       }
       const response = await fetch(downloadHref, {
         headers: authenticatedContentPath && apiKey.trim()
@@ -1355,17 +1372,74 @@ function App() {
       link.click()
       link.remove()
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
-      setMessage('下载已开始')
+      return true
     } catch (error) {
       console.warn('视频下载失败', error)
       if (authenticatedContentPath) {
-        setMessage('鉴权视频下载失败，请检查 API Key 或稍后重试')
+        return false
       } else {
-        window.open(resultHref, '_blank', 'noopener,noreferrer')
-        setMessage('浏览器无法直接下载，已打开视频链接，请使用播放器菜单保存')
+        const link = document.createElement('a')
+        link.href = downloadHref
+        link.download = filename
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        return true
       }
+    }
+  }
+
+  async function downloadVideo() {
+    if (!task || downloading || batchDownloading) return
+    setDownloading(true)
+    setMessage('正在准备下载视频...')
+    try {
+      const started = await downloadTaskVideo(task)
+      setMessage(started ? '下载已开始' : '鉴权视频下载失败，请检查 API Key 或稍后重试')
     } finally {
       setDownloading(false)
+    }
+  }
+
+  function toggleHistorySelection(taskId: string) {
+    setSelectedHistoryIds((current) => {
+      const next = new Set(current)
+      if (next.has(taskId)) next.delete(taskId)
+      else next.add(taskId)
+      return next
+    })
+  }
+
+  function toggleAllFilteredHistory() {
+    setSelectedHistoryIds((current) => {
+      const next = new Set(current)
+      if (allDownloadableFilteredSelected) downloadableFilteredHistory.forEach((item) => next.delete(item.task_id))
+      else downloadableFilteredHistory.forEach((item) => next.add(item.task_id))
+      return next
+    })
+  }
+
+  async function downloadSelectedHistory() {
+    if (batchDownloading || downloading || selectedDownloadableHistory.length === 0) return
+    setBatchDownloading(true)
+    setBatchDownloadProgress({ completed: 0, total: selectedDownloadableHistory.length })
+    setMessage(`正在准备批量下载 0/${selectedDownloadableHistory.length}...`)
+    const failed: string[] = []
+    try {
+      for (const [index, item] of selectedDownloadableHistory.entries()) {
+        const started = await downloadTaskVideo(item)
+        if (!started) failed.push(item.task_id)
+        const completed = index + 1
+        setBatchDownloadProgress({ completed, total: selectedDownloadableHistory.length })
+        setMessage(`正在准备批量下载 ${completed}/${selectedDownloadableHistory.length}...`)
+        if (completed < selectedDownloadableHistory.length) await new Promise((resolve) => window.setTimeout(resolve, BATCH_DOWNLOAD_DELAY_MS))
+      }
+      setMessage(failed.length > 0 ? `批量下载完成，${failed.length} 条鉴权视频失败，请单独重试` : `已开始下载 ${selectedDownloadableHistory.length} 个视频`)
+      setSelectedHistoryIds(new Set())
+    } finally {
+      setBatchDownloading(false)
     }
   }
 
@@ -1838,6 +1912,12 @@ function App() {
   function removeHistoryItem(taskId: string) {
     // 删除的是本地历史记录，不会取消上游任务。先停止轮询，避免异步回调把记录重新写回历史。
     stopPolling(taskId)
+    setSelectedHistoryIds((current) => {
+      if (!current.has(taskId)) return current
+      const next = new Set(current)
+      next.delete(taskId)
+      return next
+    })
     const nextHistory = sortHistoryRecords(history.filter((item) => item.task_id !== taskId))
     setHistory(nextHistory)
     if (nextHistory.length > 0) {
@@ -1862,6 +1942,7 @@ function App() {
     // 清空历史同样只影响本地记录；停止轮询后，远端任务不会再次写回已清空的历史。
     clearAllPolling()
     setHistory([])
+    setSelectedHistoryIds(new Set())
     setSelectedTaskId(null)
     setDetailTaskId(null)
     window.localStorage.removeItem(HISTORY_STORAGE_KEY)
@@ -2921,7 +3002,28 @@ function App() {
                     </button>
                   )}
                 </div>
-                <span className="history-result-count">{filteredHistory.length} 条结果</span>
+                <div className="history-batch-actions">
+                  <label className="history-select-all">
+                    <input
+                      type="checkbox"
+                      checked={allDownloadableFilteredSelected}
+                      onChange={toggleAllFilteredHistory}
+                      disabled={batchDownloading || downloadableFilteredHistory.length === 0}
+                    />
+                    <span>全选可下载</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="history-download-btn"
+                    onClick={downloadSelectedHistory}
+                    disabled={batchDownloading || downloading || selectedDownloadableHistory.length === 0}
+                    title={selectedDownloadableHistory.length > 0 ? `批量下载 ${selectedDownloadableHistory.length} 个视频` : '请选择已完成的视频'}
+                  >
+                    {batchDownloading ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}
+                    {batchDownloading ? `${batchDownloadProgress.completed}/${batchDownloadProgress.total}` : '批量下载'}
+                  </button>
+                </div>
+                <span className="history-result-count">{filteredHistory.length} 条结果{selectedDownloadableHistory.length > 0 ? ` · 已选 ${selectedDownloadableHistory.length}` : ''}</span>
               </div>
 
               {filteredHistory.length > 0 ? (
@@ -2931,8 +3033,18 @@ function App() {
                     const itemStatus = String(item.status).toLowerCase()
                     const itemVideoHref = resolveVideoHref(item.result_url)
                     const itemPreviewHref = resolveAssetHref(item.preview_url)
+                    const itemDownloadable = isHistoryTaskDownloadable(item)
+                    const itemSelected = selectedHistoryIds.has(item.task_id)
                     return (
-                      <article key={item.task_id} className={`history-item ${isCurrent ? 'is-current' : ''}`}>
+                      <article key={item.task_id} className={`history-item ${isCurrent ? 'is-current' : ''} ${itemSelected ? 'is-selected' : ''}`}>
+                        <label className="history-item-select" aria-label={itemDownloadable ? `选择下载任务 ${item.task_id}` : `${statusLabel[item.status] ?? item.status}，不可下载`}>
+                          <input
+                            type="checkbox"
+                            checked={itemSelected}
+                            onChange={() => toggleHistorySelection(item.task_id)}
+                            disabled={!itemDownloadable || batchDownloading}
+                          />
+                        </label>
                         <button
                           type="button"
                           className="history-item-main"
