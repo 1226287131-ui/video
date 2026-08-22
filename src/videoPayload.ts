@@ -308,10 +308,10 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
   return payload
 }
 
-/** Build the documented JSON protocol for MiniMax-H3-933-1440P-GF. */
+/** Build the documented JSON protocol for MiniMax-H3. */
 export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) {
   if (!isMiniMaxH3VideoModel(input.model)) {
-    throw new Error('MiniMax-H3 视频表单只能用于 MiniMax-H3-933-1440P-GF')
+    throw new Error('MiniMax-H3 视频表单只能用于 MiniMax-H3')
   }
   if (typeof input.prompt !== 'string' || !input.prompt.trim()) throw new Error('Prompt 不能为空')
 
@@ -325,24 +325,24 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
       ? input.seconds
       : MINIMAX_H3_DEFAULT_SECONDS
   if (!isValidMiniMaxH3VideoSeconds(selectedDuration)) {
-    throw new Error('MiniMax-H3-933-1440P-GF 的 duration/seconds 必须是 4 到 15 之间的整数')
+    throw new Error('MiniMax-H3 的 duration/seconds 必须是 4 到 15 之间的整数')
   }
   const normalizedDuration = Number(selectedDuration)
 
   let size: MiniMaxH3VideoSize | undefined
   if (input.size !== undefined && input.size !== '') {
     if (!isValidMiniMaxH3VideoSize(input.size)) {
-      throw new Error('MiniMax-H3-933-1440P-GF 不支持该视频尺寸')
+      throw new Error('MiniMax-H3 不支持该视频尺寸')
     }
     size = input.size.trim() as MiniMaxH3VideoSize
   }
 
   if (input.audio !== undefined && typeof input.audio !== 'boolean') {
-    throw new Error('MiniMax-H3-933-1440P-GF 的 audio 必须是布尔值')
+    throw new Error('MiniMax-H3 的 audio 必须是布尔值')
   }
   const promptEnhance = input.promptEnhance ?? input.prompt_enhance
   if (promptEnhance !== undefined && typeof promptEnhance !== 'boolean') {
-    throw new Error('MiniMax-H3-933-1440P-GF 的 prompt_enhance 必须是布尔值')
+    throw new Error('MiniMax-H3 的 prompt_enhance 必须是布尔值')
   }
 
   const resolution = normalizeOptionalMiniMaxString(input.resolution, 'resolution')

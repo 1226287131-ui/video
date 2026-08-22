@@ -251,6 +251,19 @@
       .rule-list { display: grid; gap: 7px; margin: 14px 0 0; padding: 0; list-style: none; }
       .rule-list li { position: relative; padding-left: 17px; color: var(--muted); font-size: 12px; }
       .rule-list li::before { content: ""; position: absolute; left: 0; top: .7em; width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); }
+      .resolution-guide { margin-top: 14px; }
+      .resolution-guide > summary { min-height: 42px; padding: 11px 14px; font-size: 12px; }
+      .resolution-guide-body { padding: 0 14px 14px; }
+      .resolution-guide-note { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+      .resolution-group + .resolution-group { margin-top: 14px; }
+      .resolution-group h4 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 8px; font-size: 13px; }
+      .resolution-group h4 span { color: var(--subtle); font-family: var(--mono); font-size: 10px; font-weight: 500; }
+      .resolution-table-wrap { overflow-x: auto; }
+      .resolution-table { min-width: 760px; font-size: 11px; }
+      .resolution-table th, .resolution-table td { padding: 8px 7px; }
+      .resolution-table th { white-space: nowrap; }
+      .resolution-table td:first-child { width: 70px; color: var(--cyan); font-family: var(--mono); font-weight: 700; white-space: nowrap; }
+      .resolution-table td code { color: var(--blue); font-family: var(--mono); font-size: 10px; }
       .code-panel { position: relative; min-width: 0; border: 1px solid var(--line); border-radius: 7px; background: #f8fafc; }
       .code-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border-bottom: 1px solid var(--line); color: var(--subtle); font-family: var(--mono); font-size: 10px; }
       .copy-btn { min-height: 31px; padding: 4px 9px; border: 1px solid #bfdbfe; border-radius: 5px; background: #fff; color: #1d4ed8; font-size: 11px; font-weight: 700; }
@@ -816,12 +829,13 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
         },
         {
           id: 'model-minimax', name: 'MiniMax-H3', family: 'openai-video', tone: 'coral', format: 'JSON', method: 'POST', endpoint: '/v1/videos', query: 'GET /v1/videos/{task_id}',
-          summary: '本站 H3 页面实际使用 seconds、size 与三类参考素材数组；画幅仅用于筛选可选 size，不作为 aspect_ratio 发送。', aliases: 'MiniMax-H3-933-1440P-GF / MiniMax-H3 / minimax_h3',
-          metrics: [['时长', '4-15s'], ['画幅', '8 种（选尺寸）'], ['输出尺寸', '各画幅预设'], ['参考素材', '9 图 / 3 视频 / 3 音频']],
-          fields: [['model', 'string', '是', '使用上述任一已适配模型名。'], ['prompt', 'string', '是', '非空视频描述；使用 @参考图N、@参考视频N、@参考音频N 时，页面会编译为数组顺序说明。'], ['seconds', 'integer', '是', '4-15 的整数；页面默认 5。'], ['size', 'string', '是', '宽x高；页面按 1:1、2:3、3:2、3:4、4:3、9:16、16:9、21:9 筛选预设尺寸，默认 1920x1088。'], ['images', 'string[]', '否', '公网图片 URL，最多 9 张。'], ['reference_videos', 'string[]', '否', '公网视频 URL，最多 3 段。'], ['reference_audios', 'string[]', '否', '独立公网音频 URL，最多 3 段。']],
+          summary: '本站 H3 页面实际使用 seconds、size 与三类参考素材数组；画幅仅用于筛选可选 size，不作为 aspect_ratio 发送。', aliases: 'MiniMax-H3',
+          metrics: [['时长', '4-15s'], ['画幅', '8 种'], ['输出尺寸', '0.2-2.0 MP 预设'], ['参考素材', '9 图 / 3 视频 / 3 音频']],
+          fields: [['model', 'string', '是', '使用上述任一已适配模型名。'], ['prompt', 'string', '是', '非空视频描述；使用 @参考图N、@参考视频N、@参考音频N 时，页面会编译为数组顺序说明。'], ['seconds', 'integer', '是', '4-15 的整数；页面默认 5。'], ['size', 'string', '是', '宽x高；页面按 1:1、2:3、3:2、3:4、4:3、9:16、16:9、21:9 筛选预设尺寸，默认 1920x1088；具体映射见下方速查表。'], ['images', 'string[]', '否', '公网图片 URL，最多 9 张。'], ['reference_videos', 'string[]', '否', '公网视频 URL，最多 3 段。'], ['reference_audios', 'string[]', '否', '独立公网音频 URL，最多 3 段。']],
           rules: ['网页仅在对应素材非空时发送数组字段；同类重复 URL 或文件名会在提交前去重。', '不要混发 aspect_ratio、resolution、clarity、megapixels、metadata.multiple、mode、reference_video_audios、audio 或 prompt_enhance；当前网页不会发送这些字段。', '图片、视频与音频外链可来自项目临时上传服务，且必须能被上游公网访问。'],
+          resolutionGuide: renderMiniMaxH3ResolutionGuide(),
           example: `{
-  "model": "MiniMax-H3-933-1440P-GF",
+  "model": "MiniMax-H3",
   "prompt": "让 @参考图1 中的旅人在雪山营地生火，镜头从远景缓慢推近。",
   "seconds": 10,
   "size": "1920x1088",
@@ -882,16 +896,86 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
         return `<div class="code-panel"><div class="code-head"><span>${label}</span><button class="copy-btn" data-copy-key="${key}">复制</button></div><pre><code>${escapeHtml(text)}</code></pre></div>`;
       }
 
+      function renderMiniMaxH3ResolutionGuide() {
+        const renderTable = (title, range, columns, rows) => `
+          <section class="resolution-group">
+            <h4>${escapeHtml(title)} <span>${escapeHtml(range)}</span></h4>
+            <div class="resolution-table-wrap">
+              <table class="mini-table resolution-table">
+                <thead>
+                  <tr>
+                    <th>画幅</th>
+                    ${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.map(([ratio, sizes]) => `
+                    <tr>
+                      <td><code>${escapeHtml(ratio)}</code></td>
+                      ${sizes.map((size) => `<td><code>${escapeHtml(size)}</code></td>`).join('')}
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        `;
+
+        const lowMid = renderTable(
+          '低至中等清晰度档位',
+          '0.2 - 0.9 MP',
+          ['0.2 MP', '0.3 MP', '0.4 MP', '0.5 MP', '0.6 MP', '0.7 MP', '0.8 MP', '0.9 MP'],
+          [
+            ['1:1', ['448x448', '576x576', '640x640', '736x736', '800x800', '864x864', '928x928', '960x960']],
+            ['2:3', ['384x576', '448x672', '544x800', '576x896', '640x960', '704x1056', '736x1120', '800x1184']],
+            ['3:2', ['576x384', '672x448', '800x544', '896x576', '960x640', '1056x704', '1120x736', '1184x800']],
+            ['3:4', ['384x544', '480x640', '576x736', '640x832', '672x928', '736x992', '800x1056', '832x1120']],
+            ['4:3', ['544x384', '640x480', '736x576', '832x640', '928x672', '992x736', '1056x800', '1120x832']],
+            ['9:16', ['352x608', '416x736', '480x864', '544x960', '608x1056', '640x1152', '672x1216', '736x1280']],
+            ['16:9', ['608x352', '736x416', '864x480', '960x544', '1056x608', '1152x640', '1216x672', '1280x736']],
+            ['21:9', ['704x288', '864x352', '992x416', '1120x480', '1216x512', '1312x576', '1408x608', '1472x640']],
+          ],
+        );
+
+        const high = renderTable(
+          '高等清晰度档位',
+          '0.98 - 2.0 MP',
+          ['0.98 MP', '1.0 MP', '1.2 MP', '1.5 MP', '1.8 MP', '2.0 MP'],
+          [
+            ['1:1', ['1024x1024', '1024x1024', '1120x1120', '1248x1248', '1376x1376', '1440x1440']],
+            ['2:3', ['832x1248', '832x1248', '928x1376', '1024x1536', '1120x1696', '1184x1760']],
+            ['3:2', ['1248x832', '1248x832', '1376x928', '1536x1024', '1696x1120', '1760x1184']],
+            ['3:4', ['864x1184', '896x1184', '960x1280', '1088x1440', '1184x1600', '1248x1664']],
+            ['4:3', ['1184x864', '1184x896', '1280x960', '1440x1088', '1600x1184', '1664x1248']],
+            ['9:16', ['768x1344', '768x1376', '832x1504', '928x1664', '1024x1824', '1088x1920']],
+            ['16:9', ['1344x768', '1376x768', '1504x832', '1664x928', '1824x1024', '1920x1088']],
+            ['21:9', ['1536x672', '1568x672', '1728x736', '1920x832', '2112x896', '2208x960']],
+          ],
+        );
+
+        return `
+          <details class="resolution-guide">
+            <summary>查看 H3 尺寸速查</summary>
+            <div class="resolution-guide-body">
+              <p class="resolution-guide-note">size 只发送宽x高；页面会按画幅筛选预设值。下面整理的是当前 H3 页面支持的全部分辨率，默认值为 <code>1920x1088</code>。</p>
+              ${lowMid}
+              ${high}
+            </div>
+          </details>
+        `;
+      }
+
       function renderModel(model) {
         const metrics = model.metrics.map(([label, value]) => `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`).join('');
         const fields = model.fields.map(([name, type, required, rule]) => `<tr><td><code>${name}</code></td><td>${type}</td><td>${required}</td><td>${rule}</td></tr>`).join('');
         const rules = model.rules.map((rule) => `<li>${rule}</li>`).join('');
         const codeLabel = model.format === 'Multipart' ? 'cURL · multipart/form-data' : 'JSON · application/json';
         const code = renderCode(model.example, codeLabel);
+        const resolutionGuide = model.resolutionGuide ? `<div class="resolution-guide-wrap">${model.resolutionGuide}</div>` : '';
         return `<article id="${model.id}" class="model-card" data-format="${model.format.toLowerCase()}" data-search="${escapeHtml([model.name, model.family, model.format, model.aliases, model.summary].join(' '))}">
           <header class="model-head"><div><div class="model-title-row"><h3>${model.name}</h3><span class="tag ${model.tone}">${model.family}</span><span class="tag">${model.format}</span></div><p class="model-summary">${model.summary}</p><div class="model-aliases">对外模型名：<code>${model.aliases}</code></div></div><div class="endpoint"><small>${model.method} · 创建任务</small><code>${model.endpoint}</code><small style="margin:8px 0 0">查询任务</small><code>${model.query}</code></div></header>
           <div class="metric-row">${metrics}</div>
-          <div class="model-body"><div><h4 class="subheading">参数表 <span>REQUEST FIELDS</span></h4><table class="parameter-table"><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>规则 / 说明</th></tr></thead><tbody>${fields}</tbody></table><ul class="rule-list">${rules}</ul></div><div>${code}</div></div>
+          <div class="model-body"><div><h4 class="subheading">参数表 <span>REQUEST FIELDS</span></h4><table class="parameter-table"><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>规则 / 说明</th></tr></thead><tbody>${fields}</tbody></table><ul class="rule-list">${rules}</ul>${resolutionGuide}</div><div>${code}</div></div>
         </article>`;
       }
 

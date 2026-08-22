@@ -17,6 +17,8 @@ import {
   X,
   Plus,
   Minus,
+  Maximize2,
+  Minimize2,
   History as HistoryIcon,
   Info,
   Search,
@@ -518,6 +520,7 @@ function App() {
   const [historyCollapsed, setHistoryCollapsed] = useState(false)
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null)
   const [consoleCollapsed, setConsoleCollapsed] = useState(false)
+  const [promptExpanded, setPromptExpanded] = useState(false)
   const [generationCount, setGenerationCount] = useState(MIN_GENERATION_COUNT)
   const [activeMention, setActiveMention] = useState<ActiveReferenceMention | null>(null)
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
@@ -935,7 +938,7 @@ function App() {
       })
       setImageInputMode('multiple')
       setImageSourceMode('upload')
-      setMessage(`MiniMax-H3-933-1440P-GF 使用 /v1/videos：支持 ${MINIMAX_H3_MIN_SECONDS}-${MINIMAX_H3_MAX_SECONDS} 秒、${MINIMAX_H3_MAX_IMAGES} 图、${MINIMAX_H3_MAX_VIDEOS} 视频和 ${MINIMAX_H3_MAX_AUDIOS} 个独立参考音频`)
+      setMessage(`MiniMax-H3 使用 /v1/videos：支持 ${MINIMAX_H3_MIN_SECONDS}-${MINIMAX_H3_MAX_SECONDS} 秒、${MINIMAX_H3_MAX_IMAGES} 图、${MINIMAX_H3_MAX_VIDEOS} 视频和 ${MINIMAX_H3_MAX_AUDIOS} 个独立参考音频`)
       return
     }
 
@@ -1189,7 +1192,7 @@ function App() {
       setMessage(grokModelSelected
         ? 'grok-imagine-1.5-video 需要上传真实参考图文件，不能使用图片 URL'
         : miniMaxModelSelected
-          ? 'MiniMax-H3-933-1440P-GF 需要先上传参考图生成公网外链，不能直接使用图片 URL'
+          ? 'MiniMax-H3 需要先上传参考图生成公网外链，不能直接使用图片 URL'
           : `${form.model} 参考素材必须先上传到项目域名生成外链，不能直接切换到图片 URL`)
       return
     }
@@ -1706,7 +1709,7 @@ function App() {
   function changeImageInputMode(nextMode: ImageInputMode) {
     if (nextMode === imageInputMode) return
     if (mediaResourceModelSelected) {
-      setMessage(`${form.model} 固定按参考素材数组提交，图片最多 ${videoV2MediaLimits.images} 张`)
+      setMessage(`${miniMaxModelSelected ? 'MiniMax-H3' : form.model} 固定按参考素材数组提交，图片最多 ${videoV2MediaLimits.images} 张`)
       return
     }
     if (grokModelSelected) {
@@ -1716,7 +1719,7 @@ function App() {
     }
     if (miniMaxModelSelected) {
       setImageInputMode('multiple')
-      setMessage(`MiniMax-H3-933-1440P-GF 使用参考素材数组，最多 ${MAX_MINIMAX_IMAGES} 张图片`)
+      setMessage(`MiniMax-H3 使用参考素材数组，最多 ${MAX_MINIMAX_IMAGES} 张图片`)
       return
     }
     if (referenceControlsLocked || uploadInFlightRef.current) {
@@ -2214,21 +2217,21 @@ function App() {
     }
     if (useMiniMaxApi) {
       if (!isValidMiniMaxH3VideoSeconds(form.duration)) {
-        setMessage(`MiniMax-H3-933-1440P-GF 的时长必须是 ${MINIMAX_H3_MIN_SECONDS} 到 ${MINIMAX_H3_MAX_SECONDS} 秒之间的整数`)
+        setMessage(`MiniMax-H3 的时长必须是 ${MINIMAX_H3_MIN_SECONDS} 到 ${MINIMAX_H3_MAX_SECONDS} 秒之间的整数`)
         setShowSettings(true)
         return
       }
       if (form.size && !isValidMiniMaxH3VideoSize(form.size)) {
-        setMessage('MiniMax-H3-933-1440P-GF 的输出尺寸必须是宽x高格式，例如 1920x1080')
+        setMessage('MiniMax-H3 的输出尺寸必须是宽x高格式，例如 1920x1080')
         setShowSettings(true)
         return
       }
       if (uploadedImages.length > MAX_MINIMAX_IMAGES) {
-        setMessage(`MiniMax-H3-933-1440P-GF 最多支持 ${MAX_MINIMAX_IMAGES} 张参考图，请移除多余图片`)
+        setMessage(`MiniMax-H3 最多支持 ${MAX_MINIMAX_IMAGES} 张参考图，请移除多余图片`)
         return
       }
       if (uploadedAudios.length > MINIMAX_H3_MAX_AUDIOS || uploadedVideos.length > MINIMAX_H3_MAX_VIDEOS) {
-        setMessage(`MiniMax-H3-933-1440P-GF 最多支持 ${MAX_MINIMAX_IMAGES} 图、${MINIMAX_H3_MAX_VIDEOS} 视频和 ${MINIMAX_H3_MAX_AUDIOS} 个独立参考音频`)
+        setMessage(`MiniMax-H3 最多支持 ${MAX_MINIMAX_IMAGES} 图、${MINIMAX_H3_MAX_VIDEOS} 视频和 ${MINIMAX_H3_MAX_AUDIOS} 个独立参考音频`)
         return
       }
     }
@@ -2366,7 +2369,7 @@ function App() {
     if (useMiniMaxApi) {
       const miniMaxTotalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoUrls.length
       if (submissionMode === 'image' && miniMaxTotalReferences === 0) {
-        setMessage('MiniMax-H3-933-1440P-GF 的参考素材模式至少需要上传一张图片、一个视频或一个音频')
+        setMessage('MiniMax-H3 的参考素材模式至少需要上传一张图片、一个视频或一个音频')
         return
       }
       const allMiniMaxUrls = [
@@ -3063,7 +3066,7 @@ function App() {
                               {formatTaskDate(item.created_at)} <span aria-hidden="true">·</span> {item.seconds ?? item.duration ?? '-'}s <span aria-hidden="true">·</span> {isMiniMaxH3VideoModel(item.model) ? item.size ?? '-' : item.ratio ?? '-'} <span aria-hidden="true">·</span> {isMiniMaxH3VideoModel(item.model) ? (item.audio === undefined ? '-' : item.audio ? '音频' : '无音频') : item.resolution ?? item.quality?.toUpperCase() ?? '-'}
                               {item.batch_total && item.batch_total > 1 ? <> <span aria-hidden="true">·</span> 批次 {item.batch_index}/{item.batch_total}</> : null}
                             </span>
-                            <span className="history-item-id mono">{item.model} / {item.task_id}</span>
+                            <span className="history-item-id mono">{isMiniMaxH3VideoModel(item.model) ? 'MiniMax-H3' : item.model} / {item.task_id}</span>
                           </span>
                         </button>
                         <div className="history-item-actions">
@@ -3395,7 +3398,7 @@ function App() {
             ))}
 
             {/* 输入主区域 */}
-            <div className="console-main-row prompt-row">
+            <div className={`console-main-row prompt-row ${promptExpanded ? 'is-expanded' : ''}`}>
               <div className="field prompt-field">
                 <div
                   className={`prompt-editor ${draggingPromptFile ? 'is-file-dragging' : ''}`}
@@ -3404,27 +3407,39 @@ function App() {
                   onDragLeave={handlePromptDragLeave}
                   onDrop={handlePromptDrop}
                 >
-                <input
-                  ref={promptFileInputRef}
-                  className="prompt-file-input"
-                  type="file"
-                  accept=".json,.md,.markdown,application/json,text/markdown"
-                  aria-label="选择 JSON 或 Markdown Prompt 文件"
-                  onChange={(event) => {
-                    void handlePromptFiles(event.target.files)
-                    event.target.value = ''
-                  }}
-                />
-                <button
-                  type="button"
-                  className="prompt-file-import-btn"
-                  onClick={() => promptFileInputRef.current?.click()}
-                  disabled={importingPromptFile}
-                  aria-label="从 JSON 或 Markdown 导入 Prompt"
-                  title="从 JSON 或 Markdown 导入 Prompt"
-                >
-                  {importingPromptFile ? <LoaderCircle className="spin" size={17} /> : <FileText size={17} />}
-                </button>
+                  <input
+                    ref={promptFileInputRef}
+                    className="prompt-file-input"
+                    type="file"
+                    accept=".json,.md,.markdown,application/json,text/markdown"
+                    aria-label="选择 JSON 或 Markdown Prompt 文件"
+                    onChange={(event) => {
+                      void handlePromptFiles(event.target.files)
+                      event.target.value = ''
+                    }}
+                  />
+                  <div className="prompt-editor-toolbar">
+                    <button
+                      type="button"
+                      className="prompt-expand-btn"
+                      onClick={() => setPromptExpanded((value) => !value)}
+                      aria-pressed={promptExpanded}
+                      aria-label={promptExpanded ? '收起提示词框' : '放大提示词框'}
+                      title={promptExpanded ? '收起提示词框' : '放大提示词框'}
+                    >
+                      {promptExpanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+                    </button>
+                    <button
+                      type="button"
+                      className="prompt-file-import-btn"
+                      onClick={() => promptFileInputRef.current?.click()}
+                      disabled={importingPromptFile}
+                      aria-label="从 JSON 或 Markdown 导入 Prompt"
+                      title="从 JSON 或 Markdown 导入 Prompt"
+                    >
+                      {importingPromptFile ? <LoaderCircle className="spin" size={17} /> : <FileText size={17} />}
+                    </button>
+                  </div>
                 {draggingPromptFile && (
                   <div className="prompt-file-drop-overlay" role="status" aria-live="polite">
                     <FileText size={20} aria-hidden="true" />
@@ -3567,7 +3582,7 @@ function App() {
                          onChange={(e) => changeModel(e.target.value)}
                        >
                          {models.map(m => (
-                           <option key={m.id} value={m.id}>{m.id}</option>
+                           <option key={m.id} value={m.id}>{isMiniMaxH3VideoModel(m.id) ? 'MiniMax-H3' : m.id}</option>
                          ))}
                        </select>
                     ) : (
@@ -3952,7 +3967,7 @@ function App() {
 
               <dl className="task-detail-grid">
                 <div><dt>状态</dt><dd>{statusLabel[detailTask.status] ?? detailTask.status} · {detailTask.progress}%</dd></div>
-                <div><dt>模型</dt><dd>{detailTask.model || '-'}</dd></div>
+                <div><dt>模型</dt><dd>{isMiniMaxH3VideoModel(detailTask.model) ? 'MiniMax-H3' : detailTask.model || '-'}</dd></div>
                 <div><dt>生成模式</dt><dd>{(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model) || isMiniMaxH3VideoModel(detailTask.model)) ? (detailTask.video_mode === 'image' ? '参考素材' : '文生视频') : (detailTask.video_mode ?? (detailTask.reference_count ? 'image' : 'text')) === 'image' ? '图生视频' : '文生视频'}</dd></div>
                 <div><dt>参考图</dt><dd>{detailTask.reference_count ?? 0} 张{detailTask.image_input_mode === 'multiple' ? ' · 多图' : detailTask.image_input_mode === 'single' ? ' · 单图' : ''}</dd></div>
                 {(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model) || isMiniMaxH3VideoModel(detailTask.model)) && <div><dt>独立参考音频</dt><dd>{detailTask.reference_audio_count ?? 0} 个</dd></div>}
