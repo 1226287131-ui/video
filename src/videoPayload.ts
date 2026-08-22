@@ -1,4 +1,4 @@
-import { isVideoV2FallbackModel } from './v2Media.ts'
+import { isVideoV2Model } from './v2Media.ts'
 import {
   isMiniMaxH3VideoModel,
   isValidMiniMaxH3Multiple,
@@ -450,23 +450,15 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
 }
 
 export function buildVideoV2SubmitPayload(input: VideoV2SubmitPayloadInput) {
+  if (!isVideoV2Model(input.model)) {
+    throw new Error('video-v2 视频表单只能用于 video-v2 或 video-v2-fast')
+  }
   const mediaPayload = {
     model: input.model,
     prompt: input.prompt,
     images: [...input.images],
     videos: [...input.videos],
     audios: [...input.audios],
-  }
-
-  if (isVideoV2FallbackModel(input.model)) {
-    if (input.aspectRatio !== '16:9' && input.aspectRatio !== '9:16') {
-      throw new Error('video-v2-满血兜底版仅支持 16:9 或 9:16 画幅')
-    }
-    return {
-      ...mediaPayload,
-      aspect_ratio: input.aspectRatio,
-      duration: 15,
-    }
   }
 
   return {

@@ -4,19 +4,9 @@ export const VIDEO_V2_MEDIA_LIMITS = {
   audios: 3,
 } as const
 
-export const VIDEO_V2_MINI_MEDIA_LIMITS = {
-  images: 4,
-  videos: 3,
-  audios: 1,
-} as const
-
-export const VIDEO_V2_FALLBACK_MODEL = 'video-v2-满血兜底版'
-
 export const VIDEO_V2_MODELS = [
   'video-v2',
   'video-v2-fast',
-  'video-v2-mini',
-  VIDEO_V2_FALLBACK_MODEL,
 ] as const
 
 export type VideoV2MediaCounts = {
@@ -53,17 +43,6 @@ function getSafeCount(value: number) {
 export function isVideoV2Model(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
   return VIDEO_V2_MODELS.some((candidate) => candidate === normalizedModel)
-}
-
-export function isVideoV2FallbackModel(model: unknown) {
-  return String(model || '').trim().toLowerCase() === VIDEO_V2_FALLBACK_MODEL
-}
-
-export function getVideoV2MediaLimits(model: unknown): VideoV2MediaCounts {
-  const normalizedModel = String(model || '').trim().toLowerCase()
-  return normalizedModel === 'video-v2-mini'
-    ? VIDEO_V2_MINI_MEDIA_LIMITS
-    : VIDEO_V2_MEDIA_LIMITS
 }
 
 function analyzeVideoV2Mentions(prompt: string, counts: VideoV2MediaCounts): VideoV2MentionResult {

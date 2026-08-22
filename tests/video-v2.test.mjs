@@ -9,8 +9,6 @@ import {
 } from '../src/videoApi.ts'
 import { buildVideoV2SubmitPayload } from '../src/videoPayload.ts'
 import {
-  getVideoV2MediaLimits,
-  isVideoV2FallbackModel,
   normalizeVideoV2Mentions,
   validateVideoV2Mentions,
 } from '../src/v2Media.ts'
@@ -18,59 +16,26 @@ import {
 test('recognizes supported video-v2 models without case sensitivity', () => {
   assert.equal(isVideoV2Model('video-v2'), true)
   assert.equal(isVideoV2Model(' VIDEO-V2-FAST '), true)
-  assert.equal(isVideoV2Model(' Video-V2-Mini '), true)
-  assert.equal(isVideoV2Model(' video-v2-满血兜底版 '), true)
-  assert.equal(isVideoV2FallbackModel('video-v2-满血兜底版'), true)
-  assert.equal(isVideoV2FallbackModel('video-v2'), false)
+  assert.equal(isVideoV2Model(' Video-V2-Mini '), false)
+  assert.equal(isVideoV2Model(' video-v2-满血兜底版 '), false)
   assert.equal(isVideoV2Model('video-v2-fast-720'), false)
   assert.equal(isVideoV2Model('video-v2-mini-720'), false)
   assert.equal(isVideoV2Model('video-v20'), false)
   assert.equal(isVideoV2Model('video-v1'), false)
 })
 
-test('returns model-specific video-v2 media limits', () => {
-  assert.deepEqual(getVideoV2MediaLimits('video-v2-mini'), {
-    images: 4,
-    videos: 3,
-    audios: 1,
-  })
-  assert.deepEqual(getVideoV2MediaLimits(' VIDEO-V2-MINI '), {
-    images: 4,
-    videos: 3,
-    audios: 1,
-  })
-  assert.deepEqual(getVideoV2MediaLimits('video-v2'), {
-    images: 9,
-    videos: 3,
-    audios: 3,
-  })
-  assert.deepEqual(getVideoV2MediaLimits('video-v2-fast'), {
-    images: 9,
-    videos: 3,
-    audios: 3,
-  })
-  assert.deepEqual(getVideoV2MediaLimits('video-v2-满血兜底版'), {
-    images: 9,
-    videos: 3,
-    audios: 3,
-  })
-  assert.deepEqual(getVideoV2MediaLimits('video-v1'), {
-    images: 9,
-    videos: 3,
-    audios: 3,
-  })
-})
-
 test('routes video-v2 resources through /v1/videos while legacy routing is unchanged', () => {
-  for (const model of ['video-v2', 'VIDEO-V2-FAST', 'VIDEO-V2-MINI', 'video-v2-满血兜底版']) {
+  for (const model of ['video-v2', 'VIDEO-V2-FAST']) {
     assert.equal(getVideoSubmitPath(model), '/v1/videos')
     assert.equal(getVideoTaskPath(model, 'task/a'), '/v1/videos/task%2Fa')
     assert.equal(getVideoContentPath(model, 'task/a'), '/v1/videos/task%2Fa/content')
   }
 
-  assert.equal(getVideoSubmitPath('video-v1'), '/v1/video/generations')
-  assert.equal(getVideoTaskPath('video-v1', 'task/a'), '/v1/video/generations/task%2Fa')
-  assert.equal(getVideoContentPath('video-v1', 'task/a'), '')
+  for (const model of ['video-v1', 'video-v2-mini', 'video-v2-满血兜底版']) {
+    assert.equal(getVideoSubmitPath(model), '/v1/video/generations')
+    assert.equal(getVideoTaskPath(model, 'task/a'), '/v1/video/generations/task%2Fa')
+    assert.equal(getVideoContentPath(model, 'task/a'), '')
+  }
 })
 
 test('builds only documented video-v2 fields and copies media arrays', () => {
@@ -137,57 +102,20 @@ test('includes fresh empty media arrays for text-only video-v2 requests', () => 
   assert.notEqual(payload.audios, empty)
 })
 
-test('builds the fixed 15-second fallback payload without unsupported output fields', () => {
-  const images = Object.freeze(['https://example.com/image-1.jpg'])
-  const videos = Object.freeze(['https://example.com/video-1.mp4'])
-  const audios = Object.freeze(['https://example.com/audio-1.mp3'])
-  const payload = buildVideoV2SubmitPayload({
-    model: 'video-v2-满血兜底版',
-    prompt: '@Image1 follows @Video1 with @Audio1',
-    images,
-    videos,
-    audios,
-    aspectRatio: '9:16',
-    duration: 5,
-    resolution: '1080p',
-    generateAudio: true,
-  })
-
-  assert.deepEqual(Object.keys(payload), [
-    'model',
-    'prompt',
-    'images',
-    'videos',
-    'audios',
-    'aspect_ratio',
-    'duration',
-  ])
-  assert.equal(payload.model, 'video-v2-满血兜底版')
-  assert.equal(payload.duration, 15)
-  assert.equal(payload.aspect_ratio, '9:16')
-  assert.deepEqual(payload.images, images)
-  assert.deepEqual(payload.videos, videos)
-  assert.deepEqual(payload.audios, audios)
-  assert.notEqual(payload.images, images)
-  assert.notEqual(payload.videos, videos)
-  assert.notEqual(payload.audios, audios)
-  for (const unsupportedField of ['resolution', 'generate_audio', 'size', 'quality', 'async']) {
-    assert.equal(unsupportedField in payload, false)
+test('rejects models without an internal video-v2 request configuration', () => {
+  for (const model of ['video-v2-mini', 'video-v2-满血兜底版']) {
+    assert.throws(() => buildVideoV2SubmitPayload({
+      model,
+      prompt: 'square composition',
+      images: [],
+      videos: [],
+      audios: [],
+      aspectRatio: '1:1',
+      duration: 15,
+      resolution: '720p',
+      generateAudio: false,
+    }), /只能用于 video-v2 或 video-v2-fast/)
   }
-})
-
-test('rejects unsupported fallback aspect ratios before submission', () => {
-  assert.throws(() => buildVideoV2SubmitPayload({
-    model: 'video-v2-满血兜底版',
-    prompt: 'square composition',
-    images: [],
-    videos: [],
-    audios: [],
-    aspectRatio: '1:1',
-    duration: 15,
-    resolution: '720p',
-    generateAudio: false,
-  }), /仅支持 16:9 或 9:16/)
 })
 
 test('normalizes valid English, full-width and Chinese media mentions', () => {

@@ -101,8 +101,6 @@ import {
   type VideoV3Protocol,
 } from './videoV3'
 import {
-  getVideoV2MediaLimits,
-  isVideoV2FallbackModel,
   isVideoV2Model,
   normalizeVideoV2Mentions,
   VIDEO_V2_MEDIA_LIMITS,
@@ -234,6 +232,7 @@ type UncertainSubmission = {
   batch_id: string
   batch_index: number
   created_at: number
+  error_message: string
   idempotency_key: string
 }
 
@@ -344,7 +343,6 @@ const statusLabel: Record<string, string> = {
 const durationPresets: VideoDuration[] = [5, 10, 15]
 const grokDurationPresets: VideoDuration[] = Array.from({ length: 15 }, (_, index) => index + 1)
 const miniMaxDurationShortcuts: VideoDuration[] = [5, 10, 15]
-const videoV2FallbackDurationPresets: VideoDuration[] = [15]
 const ratioPresets: VideoRatio[] = ['16:9', '9:16', '1:1', '4:3', '3:4']
 const videoV2RatioPresets: VideoRatio[] = ['21:9', '16:9', '9:16', '4:3', '1:1', '3:4']
 const videoV3DurationPresets: VideoDuration[] = Array.from(
@@ -358,7 +356,6 @@ const videoV3QyDurationPresets: VideoDuration[] = Array.from(
 )
 const videoV3QyRatioPresets: VideoRatio[] = [...VIDEO_V3_QY_RATIOS]
 const grokRatioPresets: VideoRatio[] = ['16:9', '9:16', '1:1', '4:3', '3:4', '2:3', '3:2']
-const videoV2FallbackRatioPresets: VideoRatio[] = ['16:9', '9:16']
 const qualityPresets: VideoQuality[] = ['hd', 'sd']
 const videoResolutionPresets: VideoResolution[] = ['480p', '720p', '1080p']
 
@@ -539,11 +536,10 @@ function App() {
     : MINIMAX_H3_DEFAULT_ASPECT_RATIO
   const miniMaxSizeOptions = getMiniMaxH3VideoSizesForAspectRatio(miniMaxAspectRatio)
   const mediaResourceModelSelected = videoResourceModelSelected || miniMaxModelSelected
-  const videoV2FallbackModelSelected = isVideoV2FallbackModel(form.model)
   const grokUsesMultipleReferences = grokModelSelected && mode === 'image' && uniqueUploadedAssetsById(grokReferenceImages).length > 1
   const videoV2MediaLimits = miniMaxModelSelected
     ? { images: MINIMAX_H3_MAX_IMAGES, audios: MINIMAX_H3_MAX_AUDIOS, videos: MINIMAX_H3_MAX_VIDEOS }
-    : videoV3ModelSelected ? VIDEO_V3_MEDIA_LIMITS : getVideoV2MediaLimits(form.model)
+    : videoV3ModelSelected ? VIDEO_V3_MEDIA_LIMITS : VIDEO_V2_MEDIA_LIMITS
   const videoV2ImageSizeLimit = getVideoV2ImageSizeLimit(form.model)
   const getVideoV2MediaLimit = (kind: V2MediaKind) => (
     kind === 'image'
@@ -601,9 +597,18 @@ function App() {
     try {
       const parsedUncertainSubmissions = rawUncertainSubmissions ? JSON.parse(rawUncertainSubmissions) : []
       if (Array.isArray(parsedUncertainSubmissions)) {
-        setUncertainSubmissions(parsedUncertainSubmissions.filter((item): item is UncertainSubmission => (
-          item && typeof item.idempotency_key === 'string' && typeof item.batch_id === 'string'
-        )))
+        const restoredSubmissions = parsedUncertainSubmissions
+          .filter((item) => item && typeof item.idempotency_key === 'string' && typeof item.batch_id === 'string')
+          .map((item) => ({
+            batch_id: item.batch_id,
+            batch_index: Number(item.batch_index) || 0,
+            created_at: Number(item.created_at) || Date.now(),
+            error_message: typeof item.error_message === 'string' && item.error_message.trim()
+              ? item.error_message
+              : '这条记录是在旧版本中保存的，未记录具体错误；请使用幂等键核对服务端任务。',
+            idempotency_key: item.idempotency_key,
+          }))
+        setUncertainSubmissions(restoredSubmissions)
       }
     } catch {
       window.localStorage.removeItem(UNCERTAIN_SUBMISSIONS_STORAGE_KEY)
@@ -781,15 +786,11 @@ function App() {
     ? form.videoV3Protocol === 'qy' ? videoV3QyDurationPresets : videoV3DurationPresets
     : grokModelSelected
     ? grokDurationPresets
-    : videoV2FallbackModelSelected
-      ? videoV2FallbackDurationPresets
-      : durationPresets
+    : durationPresets
   const visibleRatioPresets = videoV3ModelSelected
     ? form.videoV3Protocol === 'qy' ? videoV3QyRatioPresets : videoV3RatioPresets
     : grokModelSelected
     ? grokRatioPresets
-    : videoV2FallbackModelSelected
-      ? videoV2FallbackRatioPresets
     : videoV2ModelSelected
       ? videoV2RatioPresets
       : ratioPresets
@@ -957,37 +958,25 @@ function App() {
 
     if (!isGrokImagineVideoModel(nextModel)) {
       const nextModelUsesVideoV2 = isVideoV2Model(nextModel)
-      const nextModelUsesFallback = isVideoV2FallbackModel(nextModel)
       setForm((current) => ({
         ...current,
         model: nextModel,
-        duration: nextModelUsesFallback
-          ? 15
-          : durationPresets.includes(current.duration) ? current.duration : 5,
-        ratio: nextModelUsesFallback
-          ? (videoV2FallbackRatioPresets.includes(current.ratio) ? current.ratio : '16:9')
-          : nextModelUsesVideoV2
+        duration: durationPresets.includes(current.duration) ? current.duration : 5,
+        ratio: nextModelUsesVideoV2
           ? (isVideoV2Model(current.model) && videoV2RatioPresets.includes(current.ratio) ? current.ratio : '21:9')
           : (ratioPresets.includes(current.ratio) ? current.ratio : '16:9'),
         quality: nextModelUsesVideoV2 ? 'hd' : current.quality,
-        resolution: nextModelUsesFallback
-          ? '720p'
-          : nextModelUsesVideoV2
+        resolution: nextModelUsesVideoV2
           ? (isVideoV2Model(current.model) ? current.resolution : '480p')
           : current.resolution,
-        generateAudio: nextModelUsesFallback
-          ? false
-          : nextModelUsesVideoV2
+        generateAudio: nextModelUsesVideoV2
           ? (isVideoV2Model(current.model) ? current.generateAudio : true)
           : current.generateAudio,
       }))
       if (nextModelUsesVideoV2) {
         setImageSourceMode('upload')
         setImageInputMode('multiple')
-        const limits = getVideoV2MediaLimits(nextModel)
-        setMessage(nextModelUsesFallback
-          ? `${nextModel} 固定 15 秒、720p，仅支持 16:9 或 9:16；可上传 ${limits.images} 图、${limits.audios} 音频、${limits.videos} 视频作为参考素材`
-          : `${nextModel} 使用 /v1/videos：可纯文本生成，也可上传 ${limits.images} 图、${limits.audios} 音频、${limits.videos} 视频作为参考素材`)
+        setMessage(`${nextModel} 使用 /v1/videos：可纯文本生成，也可上传 ${VIDEO_V2_MEDIA_LIMITS.images} 图、${VIDEO_V2_MEDIA_LIMITS.audios} 音频、${VIDEO_V2_MEDIA_LIMITS.videos} 视频作为参考素材`)
       }
       return
     }
@@ -1853,7 +1842,7 @@ function App() {
     const historyUsesMiniMax = isMiniMaxH3VideoModel(item.model)
     const historyUsesMediaResource = historyUsesVideoResource || historyUsesMiniMax
     const historyUsesGrok = isGrokImagineVideoModel(item.model)
-    const historyVideoV2Limits = historyUsesVideoV3 ? VIDEO_V3_MEDIA_LIMITS : historyUsesVideoV2 ? getVideoV2MediaLimits(item.model) : { images: MAX_MINIMAX_IMAGES, audios: MINIMAX_H3_MAX_AUDIOS, videos: MINIMAX_H3_MAX_VIDEOS }
+    const historyVideoV2Limits = historyUsesVideoV3 ? VIDEO_V3_MEDIA_LIMITS : historyUsesVideoV2 ? VIDEO_V2_MEDIA_LIMITS : { images: MAX_MINIMAX_IMAGES, audios: MINIMAX_H3_MAX_AUDIOS, videos: MINIMAX_H3_MAX_VIDEOS }
     const referenceNumbers = historyUsesGrok ? [] : getReferenceMentionNumbers(item.prompt)
     const expectedReferenceCount = Math.max(Number(item.reference_count) || 0, ...referenceNumbers, 0)
     const expectedAudioCount = historyUsesMediaResource ? Number(item.reference_audio_count) || 0 : 0
@@ -2210,8 +2199,7 @@ function App() {
     const useVideoV3Api = isVideoV3Model(formSnapshot.model)
     const useVideoV2Api = isVideoV2Model(formSnapshot.model)
     const useVideoResourceApi = useVideoV3Api || useVideoV2Api
-    const useVideoV2Fallback = isVideoV2FallbackModel(formSnapshot.model)
-    const videoV2SubmissionLimits = useVideoV3Api ? VIDEO_V3_MEDIA_LIMITS : getVideoV2MediaLimits(formSnapshot.model)
+    const videoV2SubmissionLimits = useVideoV3Api ? VIDEO_V3_MEDIA_LIMITS : VIDEO_V2_MEDIA_LIMITS
     const submissionMode = mode
     const submissionInputMode = imageInputMode
     const submissionImageSourceMode = imageSourceMode
@@ -2403,18 +2391,6 @@ function App() {
       }
       submittedPrompt = mentionCompilation.prompt
     } else if (useVideoResourceApi) {
-      if (useVideoV2Fallback) {
-        if (formSnapshot.duration !== 15) {
-          setMessage('video-v2-满血兜底版固定生成 15 秒视频')
-          setShowSettings(true)
-          return
-        }
-        if (!videoV2FallbackRatioPresets.includes(formSnapshot.ratio)) {
-          setMessage('video-v2-满血兜底版仅支持 16:9 或 9:16 画幅')
-          setShowSettings(true)
-          return
-        }
-      }
       const totalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoUrls.length + (
         useVideoV3Api && formSnapshot.videoV3Protocol === 'qy' && (formSnapshot.startFrameUrl.trim() || formSnapshot.endFrameUrl.trim()) ? 1 : 0
       )
@@ -2641,8 +2617,8 @@ function App() {
           seconds: useMiniMaxApi ? formSnapshot.duration : undefined,
           ratio: formSnapshot.ratio,
           quality: formSnapshot.quality,
-          resolution: useGrokApi ? formSnapshot.resolution : useVideoV2Fallback ? '720p' : useVideoV3Api ? formSnapshot.resolution : useVideoV2Api ? formSnapshot.resolution : undefined,
-          generate_audio: useVideoV2Fallback ? false : useVideoResourceApi ? formSnapshot.generateAudio : undefined,
+          resolution: useGrokApi ? formSnapshot.resolution : useVideoV3Api ? formSnapshot.resolution : useVideoV2Api ? formSnapshot.resolution : undefined,
+          generate_audio: useVideoResourceApi ? formSnapshot.generateAudio : undefined,
           size: useMiniMaxApi ? formSnapshot.size : undefined,
           video_v3_size: useVideoV3Api ? formSnapshot.videoV3Size.trim() || undefined : undefined,
           start_frame_url: useVideoV3Api ? formSnapshot.startFrameUrl.trim() || undefined : undefined,
@@ -2684,17 +2660,20 @@ function App() {
       const uncertainFailures = failures
         .map((result) => result.reason)
         .filter((reason): reason is SubmissionStateUnknownError => reason instanceof SubmissionStateUnknownError)
+      const explicitFailure = failures.find((result) => !(result.reason instanceof SubmissionStateUnknownError))?.reason
+      const explicitFailureMessage = explicitFailure instanceof Error ? explicitFailure.message : ''
       rememberUncertainSubmissions(uncertainFailures.map((failure) => ({
         batch_id: batchId,
         batch_index: failure.batchIndex,
         created_at: batchCreatedAt,
+        error_message: failure.message,
         idempotency_key: failure.idempotencyKey,
       })))
 
       if (successfulTasks[0]) setSelectedTaskId(successfulTasks[0].task_id)
       if (successfulTasks.length === 0) {
         if (uncertainFailures.length > 0) {
-          setMessage(`${uncertainFailures.length} 个请求状态未知，请勿立即重复提交；全部幂等键已保留在页面警告中`)
+          setMessage(`${uncertainFailures.length} 个请求状态未知，请勿立即重复提交；具体错误和幂等键已保留在页面警告中${explicitFailureMessage ? `。另有明确失败：${explicitFailureMessage}` : ''}`)
         } else {
           const firstFailure = failures[0]?.reason
           setMessage(`提交失败: ${firstFailure instanceof Error ? firstFailure.message : '所有任务均提交失败'}；参考图已保留`)
@@ -2702,9 +2681,9 @@ function App() {
         return
       }
       setMessage(uncertainFailures.length > 0
-        ? `已接管 ${successfulTasks.length} 个任务，另有 ${uncertainFailures.length} 个状态未知；请勿重复提交未知部分，全部幂等键已保留`
+        ? `已接管 ${successfulTasks.length} 个任务，另有 ${uncertainFailures.length} 个状态未知；请勿重复提交未知部分，具体错误和幂等键已保留${explicitFailureMessage ? `。另有明确失败：${explicitFailureMessage}` : ''}`
         : failures.length > 0
-          ? `已接管 ${successfulTasks.length} 个任务，${failures.length} 个明确提交失败；可按失败数量重新提交`
+          ? `已接管 ${successfulTasks.length} 个任务，${failures.length} 个明确提交失败；首条错误：${explicitFailureMessage || '上游未返回具体错误'}；可按失败数量重新提交`
           : `已接管 ${successfulTasks.length} 个任务，正在异步生成；可立即提交下一批`)
       setShowSettings(false)
     } catch (err: any) {
@@ -2837,15 +2816,15 @@ function App() {
             <Info size={18} aria-hidden="true" />
             <div className="submission-warning-content">
               <strong>有 {uncertainSubmissions.length} 个提交请求状态未知</strong>
-              <p>服务端可能已经创建并计费，请勿直接重复提交。请使用下列幂等键核对任务。</p>
-              <details>
-                <summary>查看全部幂等键</summary>
-                <div className="submission-warning-keys">
-                  {uncertainSubmissions.map((item) => (
-                    <code key={item.idempotency_key}>批次 {item.batch_index} · {formatTaskDate(item.created_at)} · {item.idempotency_key}</code>
-                  ))}
-                </div>
-              </details>
+              <p>服务端可能已经创建并计费，请勿直接重复提交。上游具体错误和幂等键如下：</p>
+              <div className="submission-warning-keys">
+                {uncertainSubmissions.map((item) => (
+                  <div key={item.idempotency_key} className="submission-warning-item">
+                    <span className="submission-warning-error">{item.error_message}</span>
+                    <code>批次 {item.batch_index} · {formatTaskDate(item.created_at)} · 幂等键：{item.idempotency_key}</code>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="submission-warning-actions">
               <button
@@ -3841,17 +3820,6 @@ function App() {
                         />
                         <span>透传 bypass_face_check</span>
                       </label>
-                    </div>
-                  </>
-                ) : videoV2FallbackModelSelected ? (
-                  <>
-                    <div className="options-group" style={{ marginTop: 8 }}>
-                      <span className="options-group-label"><Settings2 size={14} /> 输出规格</span>
-                      <span className="badge">固定 720p</span>
-                    </div>
-                    <div className="options-group" style={{ marginTop: 8 }}>
-                      <span className="options-group-label"><Settings2 size={14} /> 生成音频</span>
-                      <span className="badge">当前模型不支持</span>
                     </div>
                   </>
                 ) : videoV2ModelSelected ? (
