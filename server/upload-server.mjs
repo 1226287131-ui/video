@@ -18,6 +18,11 @@ const MAX_FILES = Number(process.env.UPLOAD_MAX_FILES || 15)
 const TTL_MS = Number(process.env.UPLOAD_TTL_MS || 12 * 60 * 60 * 1000)
 const CLEANUP_INTERVAL_MS = Number(process.env.UPLOAD_CLEANUP_INTERVAL_MS || 12 * 60 * 60 * 1000)
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), 'tmp-uploads'))
+const adminPassword = String(process.env.UPLOAD_ADMIN_PASSWORD || '')
+const requireExternalToken = String(process.env.UPLOAD_REQUIRE_TOKEN || 'true').toLowerCase() !== 'false'
+const tokenFile = path.resolve(process.env.UPLOAD_TOKEN_FILE || path.join(uploadDir, 'upload-tokens.json'))
+const corsOrigin = String(process.env.UPLOAD_CORS_ORIGIN || '')
+let tokenStore = { tokens: [] }
 
 const uploadPolicies = {
   image: {
@@ -89,6 +94,79 @@ const videoHostSuffixes = ['.douyin.com', '.douyinvod.com', '.byteimg.com', '.ib
 
 await fs.promises.mkdir(uploadDir, { recursive: true })
 
+async function loadTokenStore() {
+  try {
+    const parsed = JSON.parse(await fs.promises.readFile(tokenFile, 'utf8'))
+    if (parsed && Array.isArray(parsed.tokens)) tokenStore = parsed
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.warn(`[upload-auth] token store unavailable: ${error.message}`)
+  }
+}
+
+async function saveTokenStore() {
+  const temporary = `${tokenFile}.tmp`
+  await fs.promises.writeFile(temporary, JSON.stringify(tokenStore, null, 2), { mode: 0o600 })
+  await fs.promises.rename(temporary, tokenFile)
+}
+
+function hashToken(value) {
+  return crypto.createHash('sha256').update(value).digest('hex')
+}
+
+function safeEqual(left, right) {
+  const a = Buffer.from(String(left))
+  const b = Buffer.from(String(right))
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
+function tokenIsActive(token) {
+  return !token.revokedAt && (!token.expiresAt || Date.parse(token.expiresAt) > Date.now())
+}
+
+function tokenSummary(token) {
+  return {
+    id: token.id,
+    label: token.label,
+    createdAt: token.createdAt,
+    expiresAt: token.expiresAt,
+    revokedAt: token.revokedAt || null,
+    lastUsedAt: token.lastUsedAt || null,
+    uploadCount: token.uploadCount || 0,
+    status: tokenIsActive(token) ? 'active' : token.revokedAt ? 'revoked' : 'expired',
+  }
+}
+
+function requestOriginHost(req) {
+  try {
+    return new URL(String(req.headers.origin || req.headers.referer || '')).host
+  } catch {
+    return ''
+  }
+}
+
+function requestHost(req) {
+  return String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim()
+}
+
+function isSameOriginRequest(req) {
+  const originHost = requestOriginHost(req)
+  return Boolean(
+    (originHost && originHost === requestHost(req)) ||
+    String(req.headers['sec-fetch-site'] || '').toLowerCase() === 'same-origin',
+  )
+}
+
+function setCorsHeaders(req, res) {
+  if (!corsOrigin) return
+  const origin = corsOrigin === '*' ? '*' : String(req.headers.origin || '')
+  if (corsOrigin === '*' || origin === corsOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Upload-Token')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, DELETE, OPTIONS')
+  }
+}
+
 function json(res, status, payload) {
   const body = JSON.stringify(payload)
   res.writeHead(status, {
@@ -97,6 +175,45 @@ function json(res, status, payload) {
     'Content-Length': Buffer.byteLength(body),
   })
   res.end(body)
+}
+
+function jsonWithCors(req, res, status, payload) {
+  setCorsHeaders(req, res)
+  return json(res, status, payload)
+}
+
+function readBearerToken(req) {
+  const authorization = String(req.headers.authorization || '')
+  if (authorization.toLowerCase().startsWith('bearer ')) return authorization.slice(7).trim()
+  return String(req.headers['x-upload-token'] || '').trim()
+}
+
+function findActiveToken(value) {
+  const hash = hashToken(value)
+  return tokenStore.tokens.find((token) => token.hash === hash && tokenIsActive(token)) || null
+}
+
+async function requireUploadAccess(req, res) {
+  if (!requireExternalToken || isSameOriginRequest(req)) return true
+  const value = readBearerToken(req)
+  const token = value ? findActiveToken(value) : null
+  if (!token) {
+    jsonWithCors(req, res, 401, { error: 'upload token required' })
+    return false
+  }
+  token.lastUsedAt = new Date().toISOString()
+  token.uploadCount = (token.uploadCount || 0) + 1
+  void saveTokenStore().catch(() => {})
+  return true
+}
+
+function requireAdmin(req, res) {
+  const supplied = String(req.headers['x-upload-admin-password'] || '')
+  if (!adminPassword || !safeEqual(supplied, adminPassword)) {
+    json(res, 401, { error: '管理员密码错误' })
+    return false
+  }
+  return true
 }
 
 function publicUrl(req, id) {
@@ -166,9 +283,10 @@ async function readBody(req, maxBytes = 128 * 1024) {
 }
 
 async function handleUpload(req, res) {
+  if (!(await requireUploadAccess(req, res))) return
   const contentType = String(req.headers['content-type'] || '')
   if (!contentType.startsWith('multipart/form-data')) {
-    return json(res, 415, { error: 'multipart/form-data is required' })
+    return jsonWithCors(req, res, 415, { error: 'multipart/form-data is required' })
   }
 
   const busboy = Busboy({
@@ -220,10 +338,10 @@ async function handleUpload(req, res) {
 
   if (rejected || created.length === 0) {
     await Promise.all(created.map((item) => removeFile(item.id)))
-    return json(res, 400, { error: rejected || '至少上传一个参考文件' })
+    return jsonWithCors(req, res, 400, { error: rejected || '至少上传一个参考文件' })
   }
 
-  return json(res, 201, {
+  return jsonWithCors(req, res, 201, {
     files: created.map(({ id, policy, originalName }) => ({
       id,
       url: publicUrl(req, id),
@@ -235,17 +353,59 @@ async function handleUpload(req, res) {
 }
 
 async function handleCleanup(req, res) {
+  if (!(await requireUploadAccess(req, res))) return
   let body
   try {
     body = JSON.parse(await readBody(req))
   } catch {
-    return json(res, 400, { error: 'invalid JSON body' })
+    return jsonWithCors(req, res, 400, { error: 'invalid JSON body' })
   }
   const ids = Array.isArray(body?.files)
     ? body.files.map((item) => typeof item === 'string' ? item : item?.id).filter(isSafeId)
     : []
   const removed = (await Promise.all(ids.map(removeFile))).filter(Boolean).length
-  return json(res, 200, { removed })
+  return jsonWithCors(req, res, 200, { removed })
+}
+
+async function handleTokenList(req, res) {
+  if (!requireAdmin(req, res)) return
+  return json(res, 200, { tokens: tokenStore.tokens.map(tokenSummary) })
+}
+
+async function handleTokenCreate(req, res) {
+  if (!requireAdmin(req, res)) return
+  let body
+  try {
+    body = JSON.parse(await readBody(req, 32 * 1024))
+  } catch {
+    return json(res, 400, { error: 'invalid JSON body' })
+  }
+  const label = String(body?.label || '').trim().slice(0, 80) || '下游接口'
+  const expiresInDays = Number(body?.expiresInDays)
+  const tokenValue = `vup_${crypto.randomBytes(24).toString('hex')}`
+  const record = {
+    id: crypto.randomBytes(12).toString('hex'),
+    hash: hashToken(tokenValue),
+    label,
+    createdAt: new Date().toISOString(),
+    expiresAt: Number.isFinite(expiresInDays) && expiresInDays > 0
+      ? new Date(Date.now() + Math.min(expiresInDays, 3650) * 24 * 60 * 60 * 1000).toISOString()
+      : null,
+    lastUsedAt: null,
+    uploadCount: 0,
+  }
+  tokenStore.tokens.unshift(record)
+  await saveTokenStore()
+  return json(res, 201, { token: tokenValue, item: tokenSummary(record) })
+}
+
+async function handleTokenRevoke(req, res, id) {
+  if (!requireAdmin(req, res)) return
+  const token = tokenStore.tokens.find((item) => item.id === id)
+  if (!token) return json(res, 404, { error: 'token 不存在' })
+  token.revokedAt = token.revokedAt || new Date().toISOString()
+  await saveTokenStore()
+  return json(res, 200, { item: tokenSummary(token) })
 }
 
 async function handleAsset(req, res, id) {
@@ -347,8 +507,19 @@ async function handleVideoProxy(req, res, source) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+    const isUploadApi = url.pathname === '/api/uploads' || url.pathname === '/api/uploads/cleanup'
+    if (req.method === 'OPTIONS') {
+      if (!isUploadApi) return json(res, 404, { error: 'not found' })
+      setCorsHeaders(req, res)
+      return res.writeHead(204).end()
+    }
     if (req.method === 'POST' && url.pathname === '/api/uploads') return await handleUpload(req, res)
     if (req.method === 'POST' && url.pathname === '/api/uploads/cleanup') return await handleCleanup(req, res)
+    if (req.method === 'GET' && url.pathname === '/api/upload-admin/tokens') return await handleTokenList(req, res)
+    if (req.method === 'POST' && url.pathname === '/api/upload-admin/tokens') return await handleTokenCreate(req, res)
+    if (req.method === 'DELETE' && url.pathname.startsWith('/api/upload-admin/tokens/')) {
+      return await handleTokenRevoke(req, res, decodeURIComponent(url.pathname.slice('/api/upload-admin/tokens/'.length)))
+    }
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/api/video-proxy') {
       return await handleVideoProxy(req, res, url.searchParams.get('url') || '')
     }
@@ -362,5 +533,6 @@ const server = http.createServer(async (req, res) => {
 })
 
 setInterval(() => cleanupExpired().catch(() => {}), CLEANUP_INTERVAL_MS).unref()
+await loadTokenStore()
 await cleanupExpired()
 server.listen(PORT, HOST, () => console.log(`Temporary upload server listening on http://${HOST}:${PORT}`))

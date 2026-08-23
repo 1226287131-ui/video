@@ -45,4 +45,32 @@ npm run dev
 
 部署到项目域名时，把域名的 `/api/uploads` 和 `/api/video-proxy` 反向代理到上传服务（默认 `127.0.0.1:8787`），并设置 `PUBLIC_BASE_URL=https://你的项目域名`。视频代理只做流式转发，不落盘；不要把 `server/tmp-uploads` 暴露为目录，也不要把临时文件目录加入静态站点根目录。Nginx 的上传上限应至少保留到 `210m`，以容纳单个 200MB 视频及 multipart 开销。
 
+### 下游素材上传接口与 Token
+
+下游可以直接使用项目的上传接口，把没有公网存储的图片、音频或视频先上传到本站，再把返回的 `url` 放入视频模型请求。接口继续使用临时上传目录，并按 `UPLOAD_TTL_MS`（当前 12 小时）自动清理。
+
+```bash
+curl -X POST "https://video.kkone.vip/api/uploads" \\
+  -H "Authorization: Bearer vup_你的下游Token" \\
+  -F "files=@/path/to/reference.png"
+```
+
+返回示例：
+
+```json
+{
+  "files": [
+    {
+      "id": "...png",
+      "url": "https://video.kkone.vip/api/uploads/...png",
+      "name": "reference.png",
+      "kind": "image",
+      "mime_type": "image/png"
+    }
+  ]
+}
+```
+
+管理页面位于生成页面的“展开配置 → 下游素材上传 Token”。管理员密码由服务器环境变量 `UPLOAD_ADMIN_PASSWORD` 设置，切勿写入仓库或前端源码。Token 只在创建成功时显示一次；可设置有效期、查看使用次数、最近使用时间并随时吊销。下游调用上传接口时使用 `Authorization: Bearer <token>`，同源网页上传仍保持免 Token。
+
 Nginx location 示例见 `deploy/nginx-video-v1.conf`。反代配置生效后，启动 `npm run upload-server`，再部署 `dist` 静态文件。

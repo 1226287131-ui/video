@@ -29,6 +29,9 @@ import {
   Images,
   FileMusic,
   FileVideoCamera,
+  ShieldCheck,
+  RefreshCw,
+  Ban,
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
@@ -228,6 +231,17 @@ type ModelInfo = {
   object: string
   created: number
   owned_by: string
+}
+
+type UploadTokenSummary = {
+  id: string
+  label: string
+  createdAt: string
+  expiresAt: string | null
+  revokedAt: string | null
+  lastUsedAt: string | null
+  uploadCount: number
+  status: 'active' | 'revoked' | 'expired'
 }
 
 type UncertainSubmission = {
@@ -521,6 +535,13 @@ function App() {
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null)
   const [consoleCollapsed, setConsoleCollapsed] = useState(false)
   const [promptExpanded, setPromptExpanded] = useState(false)
+  const [uploadAdminPassword, setUploadAdminPassword] = useState('')
+  const [uploadTokens, setUploadTokens] = useState<UploadTokenSummary[]>([])
+  const [uploadAdminLoading, setUploadAdminLoading] = useState(false)
+  const [uploadAdminError, setUploadAdminError] = useState('')
+  const [uploadTokenLabel, setUploadTokenLabel] = useState('下游视频模型')
+  const [uploadTokenExpiresInDays, setUploadTokenExpiresInDays] = useState('')
+  const [newUploadToken, setNewUploadToken] = useState('')
   const [generationCount, setGenerationCount] = useState(MIN_GENERATION_COUNT)
   const [activeMention, setActiveMention] = useState<ActiveReferenceMention | null>(null)
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
@@ -825,6 +846,74 @@ function App() {
     } catch {
       return false
     }
+  }
+
+  async function uploadAdminRequest(path: string, init: RequestInit = {}) {
+    const headers = new Headers(init.headers)
+    headers.set('X-Upload-Admin-Password', uploadAdminPassword)
+    if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+    const response = await fetch(path, { ...init, headers })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(String(payload?.error || `HTTP ${response.status}`))
+    return payload
+  }
+
+  async function loadUploadTokens() {
+    if (!uploadAdminPassword.trim()) {
+      setUploadAdminError('请输入管理员密码')
+      return
+    }
+    setUploadAdminLoading(true)
+    setUploadAdminError('')
+    try {
+      const payload = await uploadAdminRequest('/api/upload-admin/tokens')
+      setUploadTokens(Array.isArray(payload.tokens) ? payload.tokens : [])
+    } catch (error: any) {
+      setUploadAdminError(error?.message || '无法读取 Token 列表')
+    } finally {
+      setUploadAdminLoading(false)
+    }
+  }
+
+  async function createUploadToken() {
+    if (!uploadAdminPassword.trim()) {
+      setUploadAdminError('请输入管理员密码')
+      return
+    }
+    setUploadAdminLoading(true)
+    setUploadAdminError('')
+    setNewUploadToken('')
+    try {
+      const expiresInDays = uploadTokenExpiresInDays.trim() ? Number(uploadTokenExpiresInDays) : undefined
+      const payload = await uploadAdminRequest('/api/upload-admin/tokens', {
+        method: 'POST',
+        body: JSON.stringify({ label: uploadTokenLabel, expiresInDays }),
+      })
+      setNewUploadToken(String(payload.token || ''))
+      await loadUploadTokens()
+    } catch (error: any) {
+      setUploadAdminError(error?.message || 'Token 创建失败')
+      setUploadAdminLoading(false)
+    }
+  }
+
+  async function revokeUploadToken(id: string) {
+    if (!window.confirm('确定吊销这个 Token 吗？吊销后下游将立即无法上传。')) return
+    setUploadAdminLoading(true)
+    setUploadAdminError('')
+    try {
+      await uploadAdminRequest(`/api/upload-admin/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      await loadUploadTokens()
+    } catch (error: any) {
+      setUploadAdminError(error?.message || 'Token 吊销失败')
+      setUploadAdminLoading(false)
+    }
+  }
+
+  async function copyUploadToken() {
+    if (!newUploadToken) return
+    await navigator.clipboard?.writeText(newUploadToken)
+    setMessage('Token 已复制，请立即保存；之后不会再次显示完整 Token')
   }
   const configuredReferenceItems = mediaResourceModelSelected
     ? currentUploadedImages.slice(0, videoV2MediaLimits.images)
@@ -3910,6 +3999,79 @@ function App() {
                 )}
 
               </div>
+
+              <section className="upload-token-panel" aria-labelledby="upload-token-title">
+                <div className="upload-token-panel-head">
+                  <div>
+                    <h3 id="upload-token-title"><ShieldCheck size={16} aria-hidden="true" /> 下游素材上传 Token</h3>
+                    <p>同源网页上传仍可直接使用；下游服务调用 <code>/api/uploads</code> 时请使用 Bearer Token。素材继续按 12 小时自动清理。</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={() => void loadUploadTokens()}
+                    disabled={uploadAdminLoading}
+                    aria-label="刷新上传 Token 列表"
+                    title="刷新 Token 列表"
+                  >
+                    <RefreshCw className={uploadAdminLoading ? 'spin' : ''} size={17} />
+                  </button>
+                </div>
+                <div className="upload-token-form">
+                  <label className="field">
+                    <span>管理员密码</span>
+                    <input
+                      type="password"
+                      value={uploadAdminPassword}
+                      onChange={(event) => setUploadAdminPassword(event.target.value)}
+                      placeholder="请输入管理员密码"
+                      autoComplete="current-password"
+                    />
+                  </label>
+                  <button type="button" className="secondary-btn" onClick={() => void loadUploadTokens()} disabled={uploadAdminLoading}>
+                    <ShieldCheck size={16} /> 验证并读取
+                  </button>
+                </div>
+                <div className="upload-token-create-row">
+                  <label className="field">
+                    <span>Token 备注</span>
+                    <input type="text" value={uploadTokenLabel} onChange={(event) => setUploadTokenLabel(event.target.value)} maxLength={80} />
+                  </label>
+                  <label className="field upload-token-days-field">
+                    <span>有效期（天，可留空）</span>
+                    <input type="number" min="1" max="3650" value={uploadTokenExpiresInDays} onChange={(event) => setUploadTokenExpiresInDays(event.target.value)} placeholder="永久" />
+                  </label>
+                  <button type="button" className="primary-btn upload-token-create-btn" onClick={() => void createUploadToken()} disabled={uploadAdminLoading}>
+                    <KeyRound size={16} /> 创建 Token
+                  </button>
+                </div>
+                {newUploadToken && (
+                  <div className="upload-token-secret" role="status">
+                    <div><strong>新 Token（仅显示这一次）</strong><span>请复制并交给下游保存。</span></div>
+                    <code>{newUploadToken}</code>
+                    <button type="button" className="secondary-btn" onClick={() => void copyUploadToken()}><Copy size={16} /> 复制</button>
+                  </div>
+                )}
+                {uploadAdminError && <p className="upload-token-error" role="alert">{uploadAdminError}</p>}
+                {uploadTokens.length > 0 && (
+                  <div className="upload-token-table-wrap">
+                    <table className="upload-token-table">
+                      <thead><tr><th>备注</th><th>状态</th><th>使用次数</th><th>最近使用</th><th>操作</th></tr></thead>
+                      <tbody>
+                        {uploadTokens.map((token) => (
+                          <tr key={token.id}>
+                            <td><strong>{token.label}</strong><small>{new Date(token.createdAt).toLocaleString()}</small></td>
+                            <td><span className={`upload-token-status is-${token.status}`}>{token.status === 'active' ? '可用' : token.status === 'revoked' ? '已吊销' : '已过期'}</span></td>
+                            <td>{token.uploadCount}</td>
+                            <td>{token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleString() : '尚未使用'}</td>
+                            <td><button type="button" className="icon-btn danger" onClick={() => void revokeUploadToken(token.id)} disabled={uploadAdminLoading || token.status !== 'active'} aria-label={`吊销 ${token.label}`} title="吊销 Token"><Ban size={16} /></button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
               </div>
             )}
           </div>

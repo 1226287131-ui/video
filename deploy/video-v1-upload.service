@@ -14,7 +14,9 @@ Environment=UPLOAD_HOST=127.0.0.1
 Environment=UPLOAD_PORT=8787
 Environment=UPLOAD_DIR=/www/data/video-v1-uploads
 Environment=UPLOAD_TTL_MS=43200000
-Environment=CLEANUP_INTERVAL_MS=43200000
+Environment=UPLOAD_CLEANUP_INTERVAL_MS=43200000
+Environment=UPLOAD_REQUIRE_TOKEN=true
+Environment=UPLOAD_CORS_ORIGIN=*
 ExecStart=/usr/bin/node server/upload-server.mjs
 Restart=always
 RestartSec=5

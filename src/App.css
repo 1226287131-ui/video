@@ -2455,8 +2455,225 @@ pre {
   accent-color: #818cf8;
 }
 
+.upload-token-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid rgba(165, 180, 252, 0.18);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.upload-token-panel-head,
+.upload-token-form,
+.upload-token-create-row,
+.upload-token-secret {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.68);
+  background: rgba(15, 23, 42, 0.62);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.icon-btn:hover:not(:disabled),
+.icon-btn:focus-visible {
+  color: #fff;
+  border-color: rgba(165, 180, 252, 0.52);
+  outline: 0;
+  background: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 0 2px rgba(165, 180, 252, 0.24);
+}
+
+.icon-btn:disabled {
+  opacity: 0.46;
+  cursor: wait;
+}
+
+.upload-token-panel-head {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.upload-token-panel h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #fff;
+  font-size: 15px;
+}
+
+.upload-token-panel p {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.upload-token-panel code {
+  overflow-wrap: anywhere;
+  color: #c7d2fe;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.upload-token-form .field,
+.upload-token-create-row .field {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.upload-token-form > button,
+.upload-token-create-btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+
+.upload-token-days-field {
+  flex: 0 1 180px !important;
+}
+
+.upload-token-secret {
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 12px;
+  border: 1px solid rgba(74, 222, 128, 0.28);
+  border-radius: 8px;
+  background: rgba(22, 101, 52, 0.18);
+}
+
+.upload-token-secret > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.upload-token-secret strong {
+  color: #bbf7d0;
+  font-size: 13px;
+}
+
+.upload-token-secret span {
+  color: rgba(220, 252, 231, 0.68);
+  font-size: 12px;
+}
+
+.upload-token-error {
+  color: #fecaca !important;
+}
+
+.upload-token-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.upload-token-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+}
+
+.upload-token-table th,
+.upload-token-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.upload-token-table th {
+  color: rgba(255, 255, 255, 0.46);
+  font-weight: 600;
+}
+
+.upload-token-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.upload-token-table td:first-child {
+  white-space: normal;
+}
+
+.upload-token-table td:first-child strong,
+.upload-token-table td:first-child small {
+  display: block;
+}
+
+.upload-token-table td:first-child small {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 11px;
+}
+
+.upload-token-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.upload-token-status.is-active {
+  color: #bbf7d0;
+  background: rgba(34, 197, 94, 0.16);
+}
+
+.upload-token-status.is-revoked,
+.upload-token-status.is-expired {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.icon-btn.danger {
+  color: #fca5a5;
+}
+
+.icon-btn.danger:hover:not(:disabled),
+.icon-btn.danger:focus-visible {
+  border-color: rgba(248, 113, 113, 0.56);
+  color: #fee2e2;
+  background: rgba(239, 68, 68, 0.18);
+}
+
 @media (max-width: 768px) {
   .settings-group {
     flex-direction: column;
+  }
+
+  .upload-token-form,
+  .upload-token-create-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .upload-token-form > button,
+  .upload-token-create-btn {
+    width: 100%;
+  }
+
+  .upload-token-days-field {
+    flex-basis: auto !important;
   }
 }
