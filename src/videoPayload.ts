@@ -4,12 +4,18 @@ import {
   isValidMiniMaxH3Multiple,
   isValidMiniMaxH3VideoSeconds,
   isValidMiniMaxH3VideoSize,
+  inferMiniMaxH3WorkflowId,
+  isValidMiniMaxH3WorkflowId,
+  isValidMiniMaxH3WorkflowSize,
   MINIMAX_H3_DEFAULT_SECONDS,
   MINIMAX_H3_MAX_AUDIOS,
   MINIMAX_H3_MAX_IMAGES,
   MINIMAX_H3_MAX_VIDEO_AUDIOS,
   MINIMAX_H3_MAX_VIDEOS,
   type MiniMaxH3VideoSize,
+  type MiniMaxH3WorkflowId,
+  type MiniMaxH3WorkflowSelection,
+  type MiniMaxH3WorkflowSize,
 } from './minimaxH3.ts'
 import {
   isValidVideoV3DurationForProtocol,
@@ -67,6 +73,10 @@ export type MiniMaxH3SubmitPayloadInput = {
   metadata?: { multiple?: number | string }
   metadataMultiple?: number | string
   multiple?: number | string
+  workflowId?: MiniMaxH3WorkflowSelection | string
+  workflow_id?: MiniMaxH3WorkflowSelection | string
+  workflowSize?: MiniMaxH3WorkflowSize | string
+  workflow_size?: MiniMaxH3WorkflowSize | string
   images?: readonly string[]
   referenceImages?: readonly string[]
   reference_images?: readonly string[]
@@ -417,6 +427,40 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
     MINIMAX_H3_MAX_AUDIOS,
   )
 
+  const requestedWorkflow = input.workflowId ?? input.workflow_id ?? 'auto'
+  if (requestedWorkflow !== 'auto' && !isValidMiniMaxH3WorkflowId(requestedWorkflow)) {
+    throw new Error('MiniMax-H3 的 workflow_id 无效')
+  }
+  const workflowId: MiniMaxH3WorkflowId = requestedWorkflow === 'auto'
+    ? inferMiniMaxH3WorkflowId({ images: images.length, videos: referenceVideos.length, audios: referenceAudios.length + referenceVideoAudios.length, mode: input.mode })
+    : requestedWorkflow
+  const workflowSizeValue = input.workflowSize ?? input.workflow_size
+  const workflowSize = workflowSizeValue === undefined || workflowSizeValue === ''
+    ? undefined
+    : String(workflowSizeValue).trim()
+  if (workflowSize !== undefined && !isValidMiniMaxH3WorkflowSize(workflowSize)) {
+    throw new Error('MiniMax-H3 的超分 size 只能是 2K 或 4K')
+  }
+  const usesSuperResolution = workflowId.startsWith('cf-')
+  if (usesSuperResolution && !workflowSize) {
+    throw new Error('MiniMax-H3 的 cf 工作流必须选择 2K 或 4K size')
+  }
+  if (!usesSuperResolution && workflowSize) {
+    throw new Error('MiniMax-H3 的 2K/4K size 仅适用于 cf 工作流')
+  }
+  if (workflowId === 'text-to-video' && (images.length || referenceVideos.length || referenceAudios.length || referenceVideoAudios.length)) {
+    throw new Error('MiniMax-H3 的 text-to-video 工作流不能携带参考素材')
+  }
+  if (workflowId === 'multi-reference' || workflowId === 'cf-multi-reference') {
+    if (images.length < 1) throw new Error(`MiniMax-H3 的 ${workflowId} 工作流至少需要 1 张参考图`)
+  }
+  if (workflowId === 'fl2v' || workflowId === 'cf-fl2v') {
+    if (images.length < 1 || images.length > 2) throw new Error(`MiniMax-H3 的 ${workflowId} 工作流需要 1-2 张参考图`)
+    if (referenceVideos.length || referenceVideoAudios.length || referenceAudios.length) {
+      throw new Error(`MiniMax-H3 的 ${workflowId} 工作流不能同时使用参考视频或参考音频`)
+    }
+  }
+
   if (input.mode !== undefined && input.mode !== 'first_last_frame') {
     throw new Error('MiniMax-H3 的 mode 仅支持 first_last_frame')
   }
@@ -430,10 +474,12 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
   const payload: Record<string, unknown> = {
     model: input.model.trim(),
     prompt: input.prompt,
+    workflow_id: workflowId,
   }
   if (hasDuration || !hasSeconds) payload.duration = normalizedDuration
   else payload.seconds = normalizedDuration
-  if (size) payload.size = size
+  if (workflowSize) payload.size = workflowSize
+  else if (size) payload.size = size
   if (input.mode) payload.mode = input.mode
   if (input.audio !== undefined) payload.audio = input.audio
   if (promptEnhance !== undefined) payload.prompt_enhance = promptEnhance

@@ -87,6 +87,41 @@ export const MINIMAX_H3_DEFAULT_SECONDS = 5
 export const MINIMAX_H3_MIN_MULTIPLE = 8
 export const MINIMAX_H3_MAX_MULTIPLE = 128
 
+/** Workflow IDs documented by the MiniMax-H3 upstream contract. */
+export const MINIMAX_H3_WORKFLOW_IDS = [
+  'text-to-video',
+  'multi-reference',
+  'fl2v',
+  'cf-multi-reference',
+  'cf-fl2v',
+  'mj',
+  'cf-mj',
+] as const
+
+export type MiniMaxH3WorkflowId = typeof MINIMAX_H3_WORKFLOW_IDS[number]
+export type MiniMaxH3WorkflowSelection = 'auto' | MiniMaxH3WorkflowId
+export type MiniMaxH3WorkflowSize = '2K' | '4K'
+export const MINIMAX_H3_DEFAULT_WORKFLOW_ID: MiniMaxH3WorkflowId = 'multi-reference'
+export const MINIMAX_H3_WORKFLOW_SIZES: readonly MiniMaxH3WorkflowSize[] = ['2K', '4K']
+
+export function isValidMiniMaxH3WorkflowId(value: unknown): value is MiniMaxH3WorkflowId {
+  return typeof value === 'string' && (MINIMAX_H3_WORKFLOW_IDS as readonly string[]).includes(value)
+}
+
+export function isValidMiniMaxH3WorkflowSize(value: unknown): value is MiniMaxH3WorkflowSize {
+  return typeof value === 'string' && (MINIMAX_H3_WORKFLOW_SIZES as readonly string[]).includes(value)
+}
+
+export function inferMiniMaxH3WorkflowId(input: {
+  images: number
+  videos: number
+  audios: number
+  mode?: 'first_last_frame'
+}): MiniMaxH3WorkflowId {
+  if (input.mode === 'first_last_frame') return 'fl2v'
+  return input.images + input.videos + input.audios > 0 ? MINIMAX_H3_DEFAULT_WORKFLOW_ID : 'text-to-video'
+}
+
 export type MiniMaxH3MediaMentionCounts = {
   images: number
   videos: number

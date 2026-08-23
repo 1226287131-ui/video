@@ -87,6 +87,12 @@ import {
   MINIMAX_H3_DEFAULT_ASPECT_RATIO,
   MINIMAX_H3_DEFAULT_SIZE,
   MINIMAX_H3_DEFAULT_SECONDS,
+  MINIMAX_H3_WORKFLOW_IDS,
+  MINIMAX_H3_WORKFLOW_SIZES,
+  inferMiniMaxH3WorkflowId,
+  type MiniMaxH3WorkflowId,
+  type MiniMaxH3WorkflowSelection,
+  type MiniMaxH3WorkflowSize,
   isValidMiniMaxH3VideoSeconds,
   isValidMiniMaxH3VideoSize,
   normalizeMiniMaxH3Mentions,
@@ -182,6 +188,8 @@ type TaskRecord = {
   clarity?: string
   megapixels?: number
   metadata_multiple?: number
+  workflow_id?: MiniMaxH3WorkflowId
+  workflow_size?: MiniMaxH3WorkflowSize
   seed?: number
   bypass_face_check?: boolean
   grid_strength?: number
@@ -214,6 +222,8 @@ type FormState = {
   quality: VideoQuality
   resolution: VideoResolution
   size: VideoSize
+  miniMaxWorkflow: MiniMaxH3WorkflowSelection
+  miniMaxWorkflowSize: MiniMaxH3WorkflowSize
   videoV3Size: string
   generateAudio: boolean
   seed: number | ''
@@ -335,6 +345,8 @@ const initialForm: FormState = {
   quality: 'hd',
   resolution: '480p',
   size: MINIMAX_H3_DEFAULT_SIZE,
+  miniMaxWorkflow: 'auto',
+  miniMaxWorkflowSize: '2K',
   videoV3Size: '',
   generateAudio: true,
   seed: '',
@@ -878,6 +890,8 @@ function VideoStudioApp() {
         quality: parsed.quality ?? current.quality,
         resolution: parsed.resolution ?? current.resolution,
         size: parsed.size ?? current.size,
+        miniMaxWorkflow: parsed.workflow_id ?? current.miniMaxWorkflow,
+        miniMaxWorkflowSize: parsed.workflow_size ?? current.miniMaxWorkflowSize,
         videoV3Size: parsed.video_v3_size ?? current.videoV3Size,
         startFrameUrl: parsed.start_frame_url ?? current.startFrameUrl,
         endFrameUrl: parsed.end_frame_url ?? current.endFrameUrl,
@@ -2114,6 +2128,8 @@ function VideoStudioApp() {
         quality: item.quality ?? current.quality,
         resolution: item.resolution ?? current.resolution,
         size: item.size ?? current.size,
+        miniMaxWorkflow: item.workflow_id ?? current.miniMaxWorkflow,
+        miniMaxWorkflowSize: item.workflow_size ?? current.miniMaxWorkflowSize,
         videoV3Size: item.video_v3_size ?? current.videoV3Size,
         startFrameUrl: item.start_frame_url ?? current.startFrameUrl,
         endFrameUrl: item.end_frame_url ?? current.endFrameUrl,
@@ -2513,6 +2529,15 @@ function VideoStudioApp() {
     const referenceVideoUrls = useMiniMaxApi
       ? miniMaxVideos.map((item) => item.url)
       : videoV2Videos.map((item) => item.url)
+    const resolvedMiniMaxWorkflowId = useMiniMaxApi
+      ? formSnapshot.miniMaxWorkflow === 'auto'
+        ? inferMiniMaxH3WorkflowId({
+            images: referenceUrls.length,
+            videos: referenceVideoUrls.length,
+            audios: referenceAudioUrls.length + referenceVideoAudioUrls.length,
+          })
+        : formSnapshot.miniMaxWorkflow
+      : undefined
     const referenceUploadIds = submissionMode === 'image' && (useVideoResourceApi || useMiniMaxApi || submissionImageSourceMode === 'upload')
       ? (useVideoResourceApi
           ? videoV2Images
@@ -2716,6 +2741,8 @@ function VideoStudioApp() {
             prompt: submittedPrompt,
             seconds: formSnapshot.duration,
             size: formSnapshot.size,
+            workflowId: formSnapshot.miniMaxWorkflow,
+            workflowSize: formSnapshot.miniMaxWorkflow.startsWith('cf-') ? formSnapshot.miniMaxWorkflowSize : undefined,
             images: referenceUrls,
             referenceVideos: referenceVideoUrls,
             referenceAudios: referenceAudioUrls,
@@ -2861,6 +2888,8 @@ function VideoStudioApp() {
           resolution: useGrokApi ? formSnapshot.resolution : useVideoV3Api ? formSnapshot.resolution : useVideoV2Api ? formSnapshot.resolution : undefined,
           generate_audio: useVideoResourceApi ? formSnapshot.generateAudio : undefined,
           size: useMiniMaxApi ? formSnapshot.size : undefined,
+          workflow_id: useMiniMaxApi ? resolvedMiniMaxWorkflowId : undefined,
+          workflow_size: useMiniMaxApi && formSnapshot.miniMaxWorkflow.startsWith('cf-') ? formSnapshot.miniMaxWorkflowSize : undefined,
           video_v3_size: useVideoV3Api ? formSnapshot.videoV3Size.trim() || undefined : undefined,
           start_frame_url: useVideoV3Api ? formSnapshot.startFrameUrl.trim() || undefined : undefined,
           end_frame_url: useVideoV3Api ? formSnapshot.endFrameUrl.trim() || undefined : undefined,
@@ -3946,6 +3975,33 @@ function VideoStudioApp() {
                       </select>
                       <span className="field-hint">已按当前画幅列出全部可选尺寸。提交时仅发送该尺寸，其余高级参数由上游默认处理。</span>
                     </div>
+                    <div className="options-group" style={{ marginTop: 8 }}>
+                      <label className="options-group-label" htmlFor="minimax-workflow"><Settings2 size={14} /> workflow_id</label>
+                      <select
+                        id="minimax-workflow"
+                        className="minimax-select"
+                        value={form.miniMaxWorkflow}
+                        onChange={(event) => updateField('miniMaxWorkflow', event.target.value as MiniMaxH3WorkflowSelection)}
+                      >
+                        <option value="auto">自动选择（推荐）</option>
+                        {MINIMAX_H3_WORKFLOW_IDS.map((workflow) => <option key={workflow} value={workflow}>{workflow}</option>)}
+                      </select>
+                      <span className="field-hint">
+                        自动规则：无素材使用 text-to-video；有参考图/视频/音频使用 multi-reference。cf-* 超分和 mj 漫剧模式需要手动选择。
+                      </span>
+                    </div>
+                    {form.miniMaxWorkflow.startsWith('cf-') && <div className="options-group" style={{ marginTop: 8 }}>
+                      <label className="options-group-label" htmlFor="minimax-workflow-size"><Settings2 size={14} /> 超分尺寸</label>
+                      <select
+                        id="minimax-workflow-size"
+                        className="minimax-select"
+                        value={form.miniMaxWorkflowSize}
+                        onChange={(event) => updateField('miniMaxWorkflowSize', event.target.value as MiniMaxH3WorkflowSize)}
+                      >
+                        {MINIMAX_H3_WORKFLOW_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+                      </select>
+                      <span className="field-hint">cf-multi-reference、cf-fl2v、cf-mj 仅支持 2K 或 4K。</span>
+                    </div>}
                   </>
                 ) : videoV3ModelSelected ? (
                   <>
@@ -4207,6 +4263,7 @@ function VideoStudioApp() {
               <dl className="task-detail-grid">
                 <div><dt>状态</dt><dd>{statusLabel[detailTask.status] ?? detailTask.status} · {detailTask.progress}%</dd></div>
                 <div><dt>模型</dt><dd>{isMiniMaxH3VideoModel(detailTask.model) ? 'MiniMax-H3' : detailTask.model || '-'}</dd></div>
+                {isMiniMaxH3VideoModel(detailTask.model) && <div><dt>workflow_id</dt><dd>{detailTask.workflow_id ?? '-'}</dd></div>}
                 <div><dt>生成模式</dt><dd>{(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model) || isMiniMaxH3VideoModel(detailTask.model)) ? (detailTask.video_mode === 'image' ? '参考素材' : '文生视频') : (detailTask.video_mode ?? (detailTask.reference_count ? 'image' : 'text')) === 'image' ? '图生视频' : '文生视频'}</dd></div>
                 <div><dt>参考图</dt><dd>{detailTask.reference_count ?? 0} 张{detailTask.image_input_mode === 'multiple' ? ' · 多图' : detailTask.image_input_mode === 'single' ? ' · 单图' : ''}</dd></div>
                 {(isVideoV2Model(detailTask.model) || isVideoV3Model(detailTask.model) || isMiniMaxH3VideoModel(detailTask.model)) && <div><dt>独立参考音频</dt><dd>{detailTask.reference_audio_count ?? 0} 个</dd></div>}

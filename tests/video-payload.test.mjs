@@ -125,6 +125,7 @@ test('keeps ordinary MiniMax-H3 requests to user-facing fields and backend defau
   assert.deepEqual(payload, {
     model: 'MiniMax-H3-933-1440P-GF',
     prompt: '清晨的城市天际线，镜头缓慢推进。',
+    workflow_id: 'multi-reference',
     seconds: 10,
     size: '1920x1088',
     images: ['https://video.kkone.vip/api/uploads/city.jpg'],
@@ -160,6 +161,7 @@ test('builds MiniMax-H3 JSON with duration and all documented reference fields',
   assert.deepEqual(Object.keys(payload), [
     'model',
     'prompt',
+    'workflow_id',
     'duration',
     'size',
     'audio',
@@ -171,6 +173,7 @@ test('builds MiniMax-H3 JSON with duration and all documented reference fields',
     'metadata',
   ])
   assert.equal(payload.duration, 12)
+  assert.equal(payload.workflow_id, 'multi-reference')
   assert.equal('seconds' in payload, false)
   assert.deepEqual(payload.images, images)
   assert.notEqual(payload.images, images)
@@ -193,6 +196,7 @@ test('allows text-only MiniMax-H3 requests and enforces per-media limits', () =>
     images: [],
   })
   assert.equal('images' in payload, false)
+  assert.equal(payload.workflow_id, 'text-to-video')
   assert.equal(payload.duration, 5)
   assert.throws(() => buildMiniMaxH3SubmitPayload({
     model: 'MiniMax-H3-933-1440P-GF',
@@ -220,6 +224,51 @@ test('allows text-only MiniMax-H3 requests and enforces per-media limits', () =>
     duration: 5,
     referenceAudios: Array.from({ length: MINIMAX_H3_MAX_AUDIOS + 1 }, (_, index) => `https://example.com/audio-${index}.mp3`),
   }), /最多支持 3 个独立参考音频/)
+})
+
+test('automatically selects H3 workflow_id from the submitted media', () => {
+  const textPayload = buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '纯文字镜头',
+    seconds: 5,
+  })
+  assert.equal(textPayload.workflow_id, 'text-to-video')
+
+  const referencePayload = buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '参考图镜头',
+    seconds: 5,
+    images: ['https://example.com/a.jpg'],
+  })
+  assert.equal(referencePayload.workflow_id, 'multi-reference')
+})
+
+test('supports explicit H3 super-resolution workflows and validates their size', () => {
+  const payload = buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '超分参考图',
+    seconds: 5,
+    workflow_id: 'cf-multi-reference',
+    workflow_size: '4K',
+    images: ['https://example.com/a.jpg'],
+  })
+  assert.equal(payload.workflow_id, 'cf-multi-reference')
+  assert.equal(payload.size, '4K')
+
+  assert.throws(() => buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '缺少超分尺寸',
+    seconds: 5,
+    workflow_id: 'cf-multi-reference',
+    images: ['https://example.com/a.jpg'],
+  }), /必须选择 2K 或 4K/)
+  assert.throws(() => buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '文字不能带素材',
+    seconds: 5,
+    workflow_id: 'text-to-video',
+    images: ['https://example.com/a.jpg'],
+  }), /不能携带参考素材/)
 })
 
 test('deduplicates MiniMax references by URL and file name', () => {

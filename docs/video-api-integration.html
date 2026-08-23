@@ -632,7 +632,7 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
               <tr><td>413</td><td>单文件或请求体超过网关限制</td><td>压缩媒体，或改用可公开访问的 CDN URL。</td></tr>
               <tr><td>429 / 5xx</td><td>限流、上游繁忙、网关暂时异常</td><td>降低并发；已有 task_id 时先查询，不要立即重复创建。</td></tr>
             </tbody></table>
-            <div style="margin-top:14px"><details><summary>常见字段混用</summary><div class="details-body"><p><code>grok-imagine-1.5-video</code> 只接受 multipart 的 <code>input_reference</code> 文件；不要发送 JSON 的 <code>images</code>。</p><p><code>video-v3</code> 原协议不能发送 <code>size</code>、<code>start_frame_url</code> 或 <code>end_frame_url</code>；这些字段仅属于 QY 兼容协议。QY 的首帧或尾帧 URL 不能与 <code>images</code> 同时发送。</p><p><code>MiniMax-H3</code> 当前网页使用 <code>seconds / size</code> 和 <code>images / reference_videos / reference_audios</code>；不发送 <code>reference_video_audios</code>、<code>mode</code>、<code>clarity</code>、<code>resolution</code>、<code>aspect_ratio</code>、<code>megapixels</code> 或 <code>metadata.multiple</code>。</p></div></details><details><summary>安全与保存</summary><div class="details-body"><p>API Key 不要写入公开前端源码、仓库或查询参数。参考 URL 必须无需登录即可被上游访问。视频结果最长保留 48 小时，完成后请及时下载或转存。</p></div></details></div>
+            <div style="margin-top:14px"><details><summary>常见字段混用</summary><div class="details-body"><p><code>grok-imagine-1.5-video</code> 只接受 multipart 的 <code>input_reference</code> 文件；不要发送 JSON 的 <code>images</code>。</p><p><code>video-v3</code> 原协议不能发送 <code>size</code>、<code>start_frame_url</code> 或 <code>end_frame_url</code>；这些字段仅属于 QY 兼容协议。QY 的首帧或尾帧 URL 不能与 <code>images</code> 同时发送。</p><p><code>MiniMax-H3</code> 当前网页必带 <code>workflow_id</code>；默认无素材为 <code>text-to-video</code>、有参考素材为 <code>multi-reference</code>，<code>cf-*</code> 超分工作流需额外选择 <code>size: "2K"</code> 或 <code>"4K"</code>。网页使用 <code>seconds / size</code> 和 <code>images / reference_videos / reference_audios</code>；不发送 <code>reference_video_audios</code>、<code>mode</code>、<code>clarity</code>、<code>resolution</code>、<code>aspect_ratio</code>、<code>megapixels</code> 或 <code>metadata.multiple</code>。</p></div></details><details><summary>安全与保存</summary><div class="details-body"><p>API Key 不要写入公开前端源码、仓库或查询参数。参考 URL 必须无需登录即可被上游访问。视频结果最长保留 48 小时，完成后请及时下载或转存。</p></div></details></div>
           </section>
 
           <section id="codex-setup" class="section">
@@ -829,14 +829,15 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
         },
         {
           id: 'model-minimax', name: 'MiniMax-H3', family: 'openai-video', tone: 'coral', format: 'JSON', method: 'POST', endpoint: '/v1/videos', query: 'GET /v1/videos/{task_id}',
-          summary: '本站 H3 页面实际使用 seconds、size 与三类参考素材数组；画幅仅用于筛选可选 size，不作为 aspect_ratio 发送。', aliases: 'MiniMax-H3',
+          summary: '本站 H3 页面必带 workflow_id；默认按素材自动选择 text-to-video 或 multi-reference，也支持手动选择首尾帧、超分和漫剧工作流。', aliases: 'MiniMax-H3',
           metrics: [['时长', '4-15s'], ['画幅', '8 种'], ['输出尺寸', '0.2-2.0 MP 预设'], ['参考素材', '9 图 / 3 视频 / 3 音频']],
-          fields: [['model', 'string', '是', '使用上述任一已适配模型名。'], ['prompt', 'string', '是', '非空视频描述；使用 @参考图N、@参考视频N、@参考音频N 时，页面会编译为数组顺序说明。'], ['seconds', 'integer', '是', '4-15 的整数；页面默认 5。'], ['size', 'string', '是', '宽x高；页面按 1:1、2:3、3:2、3:4、4:3、9:16、16:9、21:9 筛选预设尺寸，默认 1920x1088；具体映射见下方速查表。'], ['images', 'string[]', '否', '公网图片 URL，最多 9 张。'], ['reference_videos', 'string[]', '否', '公网视频 URL，最多 3 段。'], ['reference_audios', 'string[]', '否', '独立公网音频 URL，最多 3 段。']],
-          rules: ['网页仅在对应素材非空时发送数组字段；同类重复 URL 或文件名会在提交前去重。', '不要混发 aspect_ratio、resolution、clarity、megapixels、metadata.multiple、mode、reference_video_audios、audio 或 prompt_enhance；当前网页不会发送这些字段。', '图片、视频与音频外链可来自项目临时上传服务，且必须能被上游公网访问。'],
+          fields: [['model', 'string', '是', '使用上述任一已适配模型名。'], ['prompt', 'string', '是', '非空视频描述；使用 @参考图N、@参考视频N、@参考音频N 时，页面会编译为数组顺序说明。'], ['workflow_id', 'enum<string>', '是', 'text-to-video、multi-reference、fl2v、cf-multi-reference、cf-fl2v、mj、cf-mj；页面默认自动选择，无素材为 text-to-video，有参考素材为 multi-reference。'], ['seconds', 'integer', '是', '4-15 的整数；页面默认 5。'], ['size', 'string', '是', '普通工作流使用宽x高；cf-* 超分工作流只能使用 2K 或 4K。普通页面按画幅筛选预设尺寸，默认 1920x1088；具体映射见下方速查表。'], ['images', 'string[]', '否', '公网图片 URL，最多 9 张。'], ['reference_videos', 'string[]', '否', '公网视频 URL，最多 3 段。'], ['reference_audios', 'string[]', '否', '独立公网音频 URL，最多 3 段。']],
+          rules: ['网页仅在对应素材非空时发送数组字段；同类重复 URL 或文件名会在提交前去重。', 'fl2v/cf-fl2v 需要 1-2 张图片且不能同时使用视频或音频；cf-* 必须选择 2K 或 4K。', '不要混发 aspect_ratio、resolution、clarity、megapixels、metadata.multiple、mode、reference_video_audios、audio 或 prompt_enhance；当前网页不会发送这些字段。', '图片、视频与音频外链可来自项目临时上传服务，且必须能被上游公网访问。'],
           resolutionGuide: renderMiniMaxH3ResolutionGuide(),
           example: `{
   "model": "MiniMax-H3",
   "prompt": "让 @参考图1 中的旅人在雪山营地生火，镜头从远景缓慢推近。",
+  "workflow_id": "multi-reference",
   "seconds": 10,
   "size": "1920x1088",
   "images": ["https://cdn.example.com/reference.png"]
