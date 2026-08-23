@@ -135,6 +135,7 @@ export type MiniMaxH3MentionResult = {
 }
 
 const MINIMAX_H3_MEDIA_MENTION_PATTERN = /(?<![A-Za-z0-9._%+-])[@＠](Image|Video|Audio|参考图|参考视频|视频|参考音频|音频)(\d+)(?![A-Za-z0-9_]|\.[A-Za-z0-9_])/giu
+const MINIMAX_H3_AUTOMATIC_MENTION_INSTRUCTION_PATTERN = /^参考素材严格按传入数组顺序编号：(?:(?:images|reference_videos|reference_audios)\[\d+\] 是第\d+(?:张参考图|个参考视频|个参考音频))(?:；(?:images|reference_videos|reference_audios)\[\d+\] 是第\d+(?:张参考图|个参考视频|个参考音频))*。请按这些编号理解下方指令，不要混淆不同参考素材。\r?\n\r?\n/u
 
 const MINIMAX_H3_MEDIA_ALIASES: Record<string, { kind: keyof MiniMaxH3MediaMentionCounts, label: string }> = {
   image: { kind: 'images', label: '张参考图' },
@@ -151,11 +152,28 @@ function safeMentionCount(value: number) {
   return Number.isSafeInteger(value) && value >= 0 ? value : 0
 }
 
+function splitMiniMaxH3AutomaticMentionInstructions(prompt: string) {
+  let body = prompt
+  let instruction = ''
+  let match = MINIMAX_H3_AUTOMATIC_MENTION_INSTRUCTION_PATTERN.exec(body)
+
+  while (match) {
+    if (!instruction) instruction = match[0]
+    body = body.slice(match[0].length)
+    match = MINIMAX_H3_AUTOMATIC_MENTION_INSTRUCTION_PATTERN.exec(body)
+  }
+
+  return { body, instruction }
+}
+
 /** Compile UI media mentions into explicit array-order instructions for H3's JSON contract. */
 export function normalizeMiniMaxH3Mentions(
   prompt: string,
   counts: MiniMaxH3MediaMentionCounts,
 ): MiniMaxH3MentionResult {
+  // Older local history may contain a previously compiled Prompt. Keep one
+  // generated instruction block so retrying it cannot accumulate duplicates.
+  const { body: sourcePrompt, instruction: existingInstruction } = splitMiniMaxH3AutomaticMentionInstructions(prompt)
   const invalidTokens: string[] = []
   const safeCounts = {
     images: safeMentionCount(counts.images),
@@ -163,7 +181,7 @@ export function normalizeMiniMaxH3Mentions(
     audios: safeMentionCount(counts.audios),
   }
   const referenced = new Map<keyof MiniMaxH3MediaMentionCounts, number[]>()
-  const normalizedPrompt = prompt.replace(
+  const normalizedPrompt = sourcePrompt.replace(
     MINIMAX_H3_MEDIA_MENTION_PATTERN,
     (token, rawAlias: string, rawNumber: string) => {
       const media = MINIMAX_H3_MEDIA_ALIASES[rawAlias.toLowerCase()]
@@ -181,7 +199,11 @@ export function normalizeMiniMaxH3Mentions(
   )
 
   if (invalidTokens.length > 0 || referenced.size === 0) {
-    return { prompt, invalidTokens, valid: invalidTokens.length === 0 }
+    return {
+      prompt: existingInstruction ? `${existingInstruction}${normalizedPrompt}` : prompt,
+      invalidTokens,
+      valid: invalidTokens.length === 0,
+    }
   }
 
   const mappings: string[] = []

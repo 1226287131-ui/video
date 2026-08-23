@@ -44,6 +44,20 @@ test('compiles MiniMax-H3 media mentions into explicit array-order instructions'
   assert.deepEqual(invalid.invalidTokens, ['@参考图3'])
 })
 
+test('does not duplicate MiniMax-H3 automatic mention instructions on retry', () => {
+  const counts = { images: 2, videos: 1, audios: 1 }
+  const first = normalizeMiniMaxH3Mentions(
+    '让 @参考图2 的人物沿着 @参考视频1 的动作前进，并保留 @参考音频1 的节奏。',
+    counts,
+  )
+  const retried = normalizeMiniMaxH3Mentions(first.prompt, counts)
+  const duplicatedLegacyPrompt = `${first.prompt.split('\n\n')[0]}\n\n${first.prompt}`
+  const recovered = normalizeMiniMaxH3Mentions(duplicatedLegacyPrompt, counts)
+
+  assert.deepEqual(retried, first)
+  assert.deepEqual(recovered, first)
+})
+
 test('multiple-image payload preserves reference order and compiled mention mapping', () => {
   const urls = Object.freeze(['https://example.com/one.jpg', 'https://example.com/two.jpg'])
   const compilation = compileReferenceMentions('让 @参考图2 使用 @参考图1 的场景', urls.length)

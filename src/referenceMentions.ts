@@ -3,6 +3,7 @@ const REFERENCE_TOKEN_PATTERN = new RegExp(REFERENCE_TOKEN_SOURCE, 'gu')
 const REFERENCE_TOKEN_TEST_PATTERN = new RegExp(REFERENCE_TOKEN_SOURCE, 'u')
 const INCOMPLETE_REFERENCE_PATTERN = /(?<![A-Za-z0-9._%+-])[@＠](?:参|参考|参考图)(?![\p{L}\p{N}_])/u
 const ACTIVE_REFERENCE_PATTERN = /(?<![A-Za-z0-9._%+-])[@＠]([^@＠\s，。！？；：,.!?;:]*)$/u
+const AUTOMATIC_REFERENCE_INSTRUCTION_PATTERN = /^参考图严格按传入顺序编号：第\d+张参考图对应 REFERENCE_\d+(?:；第\d+张参考图对应 REFERENCE_\d+)*。请严格按照这些编号理解下方指令，不要混淆不同参考图。\r?\n\r?\n/u
 
 export type ActiveReferenceMention = {
   start: number
@@ -31,6 +32,20 @@ function isActiveReferenceQuery(query: string) {
   return /^参考图[1-9]\d*$/u.test(query)
 }
 
+function splitAutomaticReferenceInstructions(prompt: string) {
+  let body = prompt
+  let instruction = ''
+  let match = AUTOMATIC_REFERENCE_INSTRUCTION_PATTERN.exec(body)
+
+  while (match) {
+    if (!instruction) instruction = match[0]
+    body = body.slice(match[0].length)
+    match = AUTOMATIC_REFERENCE_INSTRUCTION_PATTERN.exec(body)
+  }
+
+  return { body, instruction }
+}
+
 export function getReferenceMentionNumbers(prompt: string, referenceCount = Number.POSITIVE_INFINITY) {
   const numbers: number[] = []
   for (const match of prompt.matchAll(REFERENCE_TOKEN_PATTERN)) {
@@ -47,7 +62,8 @@ export function hasReferenceMentions(prompt: string) {
 }
 
 export function compileReferenceMentions(prompt: string, referenceCount: number): ReferenceCompilation {
-  const rawPrompt = prompt.trim()
+  const { body, instruction: existingInstruction } = splitAutomaticReferenceInstructions(prompt.trim())
+  const rawPrompt = body.trim()
   const referencedNumbers: number[] = []
   const invalidTokens: string[] = []
 
@@ -64,7 +80,12 @@ export function compileReferenceMentions(prompt: string, referenceCount: number)
 
   const incomplete = INCOMPLETE_REFERENCE_PATTERN.test(rawPrompt)
   if (invalidTokens.length > 0 || incomplete || referencedNumbers.length === 0) {
-    return { prompt: rawPrompt, referencedNumbers, invalidTokens, incomplete }
+    return {
+      prompt: existingInstruction ? `${existingInstruction}${rawPrompt}` : rawPrompt,
+      referencedNumbers,
+      invalidTokens,
+      incomplete,
+    }
   }
 
   const compiledBody = rawPrompt.replace(REFERENCE_TOKEN_PATTERN, (token, rawNumber: string) => {

@@ -38,6 +38,19 @@ test('compileReferenceMentions compiles every repeated mention but records its n
   assert.equal(compiledBody.match(/第2张参考图（REFERENCE_1）/g)?.length, 2)
 })
 
+test('compileReferenceMentions does not duplicate automatic instructions on retry', () => {
+  const first = compileReferenceMentions('让 @参考图2 使用 @参考图1 的场景', 2)
+  const retried = compileReferenceMentions(first.prompt, 2)
+  const duplicatedLegacyPrompt = `${first.prompt.split('\n\n')[0]}\n\n${first.prompt}`
+  const recovered = compileReferenceMentions(duplicatedLegacyPrompt, 2)
+
+  for (const result of [retried, recovered]) {
+    assert.equal(result.prompt, first.prompt)
+    assert.deepEqual(result.invalidTokens, [])
+    assert.equal(result.incomplete, false)
+  }
+})
+
 test('compileReferenceMentions rejects zero, out-of-range, and leading-zero numbers', () => {
   const prompt = '@参考图0、@参考图11、@参考图01 都不合法'
   const result = compileReferenceMentions(prompt, 10)
