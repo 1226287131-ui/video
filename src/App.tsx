@@ -32,6 +32,9 @@ import {
   ShieldCheck,
   RefreshCw,
   Ban,
+  ArrowLeft,
+  Eye,
+  EyeOff,
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
@@ -485,7 +488,227 @@ function resolveAssetHref(rawUrl = '') {
   return rawUrl.startsWith('/api/') ? `${VIDEO_ASSET_BASE_URL}${rawUrl}` : rawUrl
 }
 
-function App() {
+function UploadTokenAdmin() {
+  const [uploadAdminPassword, setUploadAdminPassword] = useState('')
+  const [uploadTokens, setUploadTokens] = useState<UploadTokenSummary[]>([])
+  const [uploadAdminLoading, setUploadAdminLoading] = useState(false)
+  const [uploadAdminError, setUploadAdminError] = useState('')
+  const [uploadAdminNotice, setUploadAdminNotice] = useState('')
+  const [uploadTokenLabel, setUploadTokenLabel] = useState('下游视频模型')
+  const [uploadTokenExpiresInDays, setUploadTokenExpiresInDays] = useState('')
+  const [newUploadToken, setNewUploadToken] = useState('')
+  const [passwordVisible, setPasswordVisible] = useState(false)
+  const [authenticated, setAuthenticated] = useState(false)
+
+  async function uploadAdminRequest(path: string, init: RequestInit = {}) {
+    const headers = new Headers(init.headers)
+    headers.set('X-Upload-Admin-Password', uploadAdminPassword)
+    if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+    const response = await fetch(path, { ...init, headers })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(String(payload?.error || `HTTP ${response.status}`))
+    return payload
+  }
+
+  async function loadUploadTokens() {
+    if (!uploadAdminPassword.trim()) {
+      setUploadAdminError('请输入管理员密码后再验证')
+      return
+    }
+    setUploadAdminLoading(true)
+    setUploadAdminError('')
+    setUploadAdminNotice('')
+    try {
+      const payload = await uploadAdminRequest('/api/upload-admin/tokens')
+      const tokens = Array.isArray(payload.tokens) ? payload.tokens : []
+      setUploadTokens(tokens)
+      setAuthenticated(true)
+      setUploadAdminNotice(`验证成功，已读取 ${tokens.length} 个 Token`)
+    } catch (error: any) {
+      setAuthenticated(false)
+      setUploadTokens([])
+      setUploadAdminError(error?.message || '无法读取 Token 列表')
+    } finally {
+      setUploadAdminLoading(false)
+    }
+  }
+
+  async function createUploadToken() {
+    if (!authenticated || !uploadAdminPassword.trim()) {
+      setUploadAdminError('请先验证管理员密码')
+      return
+    }
+    setUploadAdminLoading(true)
+    setUploadAdminError('')
+    setUploadAdminNotice('')
+    setNewUploadToken('')
+    try {
+      const expiresInDays = uploadTokenExpiresInDays.trim() ? Number(uploadTokenExpiresInDays) : undefined
+      const payload = await uploadAdminRequest('/api/upload-admin/tokens', {
+        method: 'POST',
+        body: JSON.stringify({ label: uploadTokenLabel, expiresInDays }),
+      })
+      setNewUploadToken(String(payload.token || ''))
+      setUploadTokens((current) => [payload.item as UploadTokenSummary, ...current])
+      setUploadAdminNotice('Token 已创建，请立即复制并妥善保存')
+    } catch (error: any) {
+      setUploadAdminError(error?.message || 'Token 创建失败')
+    } finally {
+      setUploadAdminLoading(false)
+    }
+  }
+
+  async function revokeUploadToken(id: string) {
+    if (!window.confirm('确定吊销这个 Token 吗？吊销后下游将立即无法上传。')) return
+    setUploadAdminLoading(true)
+    setUploadAdminError('')
+    setUploadAdminNotice('')
+    try {
+      const payload = await uploadAdminRequest(`/api/upload-admin/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      setUploadTokens((current) => current.map((token) => token.id === id ? payload.item as UploadTokenSummary : token))
+      setUploadAdminNotice('Token 已吊销')
+    } catch (error: any) {
+      setUploadAdminError(error?.message || 'Token 吊销失败')
+    } finally {
+      setUploadAdminLoading(false)
+    }
+  }
+
+  async function copyUploadToken() {
+    if (!newUploadToken) return
+    try {
+      await navigator.clipboard.writeText(newUploadToken)
+      setUploadAdminNotice('Token 已复制；完整 Token 关闭页面后不会再次显示')
+    } catch {
+      setUploadAdminError('复制失败，请手动保存 Token')
+    }
+  }
+
+  function handlePasswordChange(value: string) {
+    setUploadAdminPassword(value)
+    setAuthenticated(false)
+    setUploadTokens([])
+    setNewUploadToken('')
+    setUploadAdminError('')
+    setUploadAdminNotice('')
+  }
+
+  return (
+    <main className="upload-admin-shell">
+      <a className="upload-admin-back" href="/" aria-label="返回视频生成页面">
+        <ArrowLeft size={17} aria-hidden="true" /> 返回视频生成
+      </a>
+      <section className="upload-admin-page" aria-labelledby="upload-admin-title">
+        <header className="upload-admin-page-head">
+          <div className="upload-admin-title-icon" aria-hidden="true"><ShieldCheck size={24} /></div>
+          <div>
+            <p className="upload-admin-kicker">PRIVATE CONSOLE</p>
+            <h1 id="upload-admin-title">素材上传 Token 管理</h1>
+            <p>创建和吊销下游素材上传凭证。素材文件仍按 12 小时自动清理。</p>
+          </div>
+          {authenticated && (
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => void loadUploadTokens()}
+              disabled={uploadAdminLoading}
+              aria-label="刷新 Token 列表"
+              title="刷新 Token 列表"
+            >
+              <RefreshCw className={uploadAdminLoading ? 'spin' : ''} size={17} />
+            </button>
+          )}
+        </header>
+
+        <section className="upload-token-panel upload-admin-auth" aria-labelledby="upload-admin-auth-title">
+          <h2 id="upload-admin-auth-title">管理员验证</h2>
+          <form className="upload-token-form" onSubmit={(event) => { event.preventDefault(); void loadUploadTokens() }}>
+            <label className="field">
+              <span>管理员密码</span>
+              <div className="upload-admin-password-control">
+                <input
+                  type={passwordVisible ? 'text' : 'password'}
+                  value={uploadAdminPassword}
+                  onChange={(event) => handlePasswordChange(event.target.value)}
+                  placeholder="请输入管理员密码"
+                  autoComplete="current-password"
+                  aria-describedby="upload-admin-password-hint"
+                />
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => setPasswordVisible((value) => !value)}
+                  aria-label={passwordVisible ? '隐藏管理员密码' : '显示管理员密码'}
+                  title={passwordVisible ? '隐藏密码' : '显示密码'}
+                >
+                  {passwordVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
+              <small id="upload-admin-password-hint">密码不会保存在浏览器中。连续失败会被服务器限速。</small>
+            </label>
+            <button type="submit" className="primary-btn upload-token-create-btn" disabled={uploadAdminLoading}>
+              {uploadAdminLoading ? <LoaderCircle className="spin" size={16} /> : <ShieldCheck size={16} />} 验证并进入
+            </button>
+          </form>
+        </section>
+
+        {uploadAdminError && <p className="upload-token-error upload-admin-feedback" role="alert">{uploadAdminError}</p>}
+        {uploadAdminNotice && <p className="upload-admin-notice upload-admin-feedback" role="status">{uploadAdminNotice}</p>}
+
+        {authenticated && (
+          <section className="upload-admin-workspace" aria-labelledby="upload-admin-workspace-title">
+            <div className="upload-admin-section-head">
+              <div>
+                <h2 id="upload-admin-workspace-title">下游 Token</h2>
+                <p>每个下游使用独立 Token，方便查看使用情况与单独吊销。</p>
+              </div>
+            </div>
+            <div className="upload-token-create-row">
+              <label className="field">
+                <span>Token 备注</span>
+                <input type="text" value={uploadTokenLabel} onChange={(event) => setUploadTokenLabel(event.target.value)} maxLength={80} />
+              </label>
+              <label className="field upload-token-days-field">
+                <span>有效期（天，可留空）</span>
+                <input type="number" min="1" max="3650" value={uploadTokenExpiresInDays} onChange={(event) => setUploadTokenExpiresInDays(event.target.value)} placeholder="永久" />
+              </label>
+              <button type="button" className="primary-btn upload-token-create-btn" onClick={() => void createUploadToken()} disabled={uploadAdminLoading}>
+                {uploadAdminLoading ? <LoaderCircle className="spin" size={16} /> : <KeyRound size={16} />} 创建 Token
+              </button>
+            </div>
+            {newUploadToken && (
+              <div className="upload-token-secret" role="status">
+                <div><strong>新 Token（仅显示这一次）</strong><span>请复制并交给下游保存。</span></div>
+                <code>{newUploadToken}</code>
+                <button type="button" className="secondary-btn" onClick={() => void copyUploadToken()}><Copy size={16} /> 复制</button>
+              </div>
+            )}
+            {uploadTokens.length > 0 ? (
+              <div className="upload-token-table-wrap">
+                <table className="upload-token-table">
+                  <thead><tr><th>备注</th><th>状态</th><th>使用次数</th><th>最近使用</th><th>操作</th></tr></thead>
+                  <tbody>
+                    {uploadTokens.map((token) => (
+                      <tr key={token.id}>
+                        <td data-label="备注"><strong>{token.label}</strong><small>创建于 {new Date(token.createdAt).toLocaleString()}</small></td>
+                        <td data-label="状态"><span className={`upload-token-status is-${token.status}`}>{token.status === 'active' ? '可用' : token.status === 'revoked' ? '已吊销' : '已过期'}</span></td>
+                        <td data-label="使用次数">{token.uploadCount}</td>
+                        <td data-label="最近使用">{token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleString() : '尚未使用'}</td>
+                        <td data-label="操作"><button type="button" className="icon-btn danger" onClick={() => void revokeUploadToken(token.id)} disabled={uploadAdminLoading || token.status !== 'active'} aria-label={`吊销 ${token.label}`} title="吊销 Token"><Ban size={16} /></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <p className="upload-admin-empty">尚未创建下游 Token。</p>}
+          </section>
+        )}
+      </section>
+    </main>
+  )
+}
+
+function VideoStudioApp() {
   const [form, setForm] = useState<FormState>(initialForm)
   const [apiKey, setApiKey] = useState('')
   const [models, setModels] = useState<ModelInfo[]>([])
@@ -535,13 +758,6 @@ function App() {
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null)
   const [consoleCollapsed, setConsoleCollapsed] = useState(false)
   const [promptExpanded, setPromptExpanded] = useState(false)
-  const [uploadAdminPassword, setUploadAdminPassword] = useState('')
-  const [uploadTokens, setUploadTokens] = useState<UploadTokenSummary[]>([])
-  const [uploadAdminLoading, setUploadAdminLoading] = useState(false)
-  const [uploadAdminError, setUploadAdminError] = useState('')
-  const [uploadTokenLabel, setUploadTokenLabel] = useState('下游视频模型')
-  const [uploadTokenExpiresInDays, setUploadTokenExpiresInDays] = useState('')
-  const [newUploadToken, setNewUploadToken] = useState('')
   const [generationCount, setGenerationCount] = useState(MIN_GENERATION_COUNT)
   const [activeMention, setActiveMention] = useState<ActiveReferenceMention | null>(null)
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
@@ -848,73 +1064,6 @@ function App() {
     }
   }
 
-  async function uploadAdminRequest(path: string, init: RequestInit = {}) {
-    const headers = new Headers(init.headers)
-    headers.set('X-Upload-Admin-Password', uploadAdminPassword)
-    if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
-    const response = await fetch(path, { ...init, headers })
-    const payload = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(String(payload?.error || `HTTP ${response.status}`))
-    return payload
-  }
-
-  async function loadUploadTokens() {
-    if (!uploadAdminPassword.trim()) {
-      setUploadAdminError('请输入管理员密码')
-      return
-    }
-    setUploadAdminLoading(true)
-    setUploadAdminError('')
-    try {
-      const payload = await uploadAdminRequest('/api/upload-admin/tokens')
-      setUploadTokens(Array.isArray(payload.tokens) ? payload.tokens : [])
-    } catch (error: any) {
-      setUploadAdminError(error?.message || '无法读取 Token 列表')
-    } finally {
-      setUploadAdminLoading(false)
-    }
-  }
-
-  async function createUploadToken() {
-    if (!uploadAdminPassword.trim()) {
-      setUploadAdminError('请输入管理员密码')
-      return
-    }
-    setUploadAdminLoading(true)
-    setUploadAdminError('')
-    setNewUploadToken('')
-    try {
-      const expiresInDays = uploadTokenExpiresInDays.trim() ? Number(uploadTokenExpiresInDays) : undefined
-      const payload = await uploadAdminRequest('/api/upload-admin/tokens', {
-        method: 'POST',
-        body: JSON.stringify({ label: uploadTokenLabel, expiresInDays }),
-      })
-      setNewUploadToken(String(payload.token || ''))
-      await loadUploadTokens()
-    } catch (error: any) {
-      setUploadAdminError(error?.message || 'Token 创建失败')
-      setUploadAdminLoading(false)
-    }
-  }
-
-  async function revokeUploadToken(id: string) {
-    if (!window.confirm('确定吊销这个 Token 吗？吊销后下游将立即无法上传。')) return
-    setUploadAdminLoading(true)
-    setUploadAdminError('')
-    try {
-      await uploadAdminRequest(`/api/upload-admin/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' })
-      await loadUploadTokens()
-    } catch (error: any) {
-      setUploadAdminError(error?.message || 'Token 吊销失败')
-      setUploadAdminLoading(false)
-    }
-  }
-
-  async function copyUploadToken() {
-    if (!newUploadToken) return
-    await navigator.clipboard?.writeText(newUploadToken)
-    setMessage('Token 已复制，请立即保存；之后不会再次显示完整 Token')
-  }
   const configuredReferenceItems = mediaResourceModelSelected
     ? currentUploadedImages.slice(0, videoV2MediaLimits.images)
         .map((item, index) => ({ key: item.id, number: index + 1, url: item.url }))
@@ -4000,78 +4149,6 @@ function App() {
 
               </div>
 
-              <section className="upload-token-panel" aria-labelledby="upload-token-title">
-                <div className="upload-token-panel-head">
-                  <div>
-                    <h3 id="upload-token-title"><ShieldCheck size={16} aria-hidden="true" /> 下游素材上传 Token</h3>
-                    <p>同源网页上传仍可直接使用；下游服务调用 <code>/api/uploads</code> 时请使用 Bearer Token。素材继续按 12 小时自动清理。</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    onClick={() => void loadUploadTokens()}
-                    disabled={uploadAdminLoading}
-                    aria-label="刷新上传 Token 列表"
-                    title="刷新 Token 列表"
-                  >
-                    <RefreshCw className={uploadAdminLoading ? 'spin' : ''} size={17} />
-                  </button>
-                </div>
-                <div className="upload-token-form">
-                  <label className="field">
-                    <span>管理员密码</span>
-                    <input
-                      type="password"
-                      value={uploadAdminPassword}
-                      onChange={(event) => setUploadAdminPassword(event.target.value)}
-                      placeholder="请输入管理员密码"
-                      autoComplete="current-password"
-                    />
-                  </label>
-                  <button type="button" className="secondary-btn" onClick={() => void loadUploadTokens()} disabled={uploadAdminLoading}>
-                    <ShieldCheck size={16} /> 验证并读取
-                  </button>
-                </div>
-                <div className="upload-token-create-row">
-                  <label className="field">
-                    <span>Token 备注</span>
-                    <input type="text" value={uploadTokenLabel} onChange={(event) => setUploadTokenLabel(event.target.value)} maxLength={80} />
-                  </label>
-                  <label className="field upload-token-days-field">
-                    <span>有效期（天，可留空）</span>
-                    <input type="number" min="1" max="3650" value={uploadTokenExpiresInDays} onChange={(event) => setUploadTokenExpiresInDays(event.target.value)} placeholder="永久" />
-                  </label>
-                  <button type="button" className="primary-btn upload-token-create-btn" onClick={() => void createUploadToken()} disabled={uploadAdminLoading}>
-                    <KeyRound size={16} /> 创建 Token
-                  </button>
-                </div>
-                {newUploadToken && (
-                  <div className="upload-token-secret" role="status">
-                    <div><strong>新 Token（仅显示这一次）</strong><span>请复制并交给下游保存。</span></div>
-                    <code>{newUploadToken}</code>
-                    <button type="button" className="secondary-btn" onClick={() => void copyUploadToken()}><Copy size={16} /> 复制</button>
-                  </div>
-                )}
-                {uploadAdminError && <p className="upload-token-error" role="alert">{uploadAdminError}</p>}
-                {uploadTokens.length > 0 && (
-                  <div className="upload-token-table-wrap">
-                    <table className="upload-token-table">
-                      <thead><tr><th>备注</th><th>状态</th><th>使用次数</th><th>最近使用</th><th>操作</th></tr></thead>
-                      <tbody>
-                        {uploadTokens.map((token) => (
-                          <tr key={token.id}>
-                            <td><strong>{token.label}</strong><small>{new Date(token.createdAt).toLocaleString()}</small></td>
-                            <td><span className={`upload-token-status is-${token.status}`}>{token.status === 'active' ? '可用' : token.status === 'revoked' ? '已吊销' : '已过期'}</span></td>
-                            <td>{token.uploadCount}</td>
-                            <td>{token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleString() : '尚未使用'}</td>
-                            <td><button type="button" className="icon-btn danger" onClick={() => void revokeUploadToken(token.id)} disabled={uploadAdminLoading || token.status !== 'active'} aria-label={`吊销 ${token.label}`} title="吊销 Token"><Ban size={16} /></button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
               </div>
             )}
           </div>
@@ -4153,6 +4230,11 @@ function App() {
       </dialog>
     </main>
   )
+}
+
+function App() {
+  const path = window.location.pathname.replace(/\/+$/, '') || '/'
+  return path === '/admin' ? <UploadTokenAdmin /> : <VideoStudioApp />
 }
 
 export default App

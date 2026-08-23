@@ -71,6 +71,6 @@ curl -X POST "https://video.kkone.vip/api/uploads" \\
 }
 ```
 
-管理页面位于生成页面的“展开配置 → 下游素材上传 Token”。管理员密码由服务器环境变量 `UPLOAD_ADMIN_PASSWORD` 设置，切勿写入仓库或前端源码。Token 只在创建成功时显示一次；可设置有效期、查看使用次数、最近使用时间并随时吊销。下游调用上传接口时使用 `Authorization: Bearer <token>`，同源网页上传仍保持免 Token。
+管理页面位于 `https://video.kkone.vip/admin`，不会在视频生成首页展示入口。管理员密码由服务器环境变量 `UPLOAD_ADMIN_PASSWORD` 设置，切勿写入仓库或前端源码。服务端会按来源 IP 记录连续失败：15 分钟内错误 5 次后锁定 15 分钟，并返回 HTTP `429` 和 `Retry-After`。Token 只在创建成功时显示一次；可设置有效期、查看使用次数、最近使用时间并随时吊销。下游调用上传接口时使用 `Authorization: Bearer <token>`，同源网页上传仍保持免 Token。
 
 Nginx location 示例见 `deploy/nginx-video-v1.conf`。反代配置生效后，启动 `npm run upload-server`，再部署 `dist` 静态文件。

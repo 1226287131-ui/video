@@ -2466,6 +2466,132 @@ pre {
   background: rgba(15, 23, 42, 0.42);
 }
 
+.upload-admin-shell {
+  min-height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.upload-admin-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.upload-admin-back:hover,
+.upload-admin-back:focus-visible {
+  color: #fff;
+  outline: 0;
+}
+
+.upload-admin-back:focus-visible {
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgba(165, 180, 252, 0.68);
+}
+
+.upload-admin-page {
+  width: min(100%, 960px);
+  margin: 20px auto 0;
+}
+
+.upload-admin-page-head {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.upload-admin-title-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid rgba(165, 180, 252, 0.35);
+  border-radius: 8px;
+  color: #c7d2fe;
+  background: rgba(99, 102, 241, 0.14);
+}
+
+.upload-admin-kicker {
+  margin: 0 0 6px;
+  color: #a5b4fc;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.upload-admin-page h1 {
+  margin: 0;
+  color: #fff;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  font-size: clamp(28px, 4vw, 40px);
+  letter-spacing: 0;
+}
+
+.upload-admin-page-head p:not(.upload-admin-kicker),
+.upload-admin-section-head p,
+.upload-admin-empty {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.upload-admin-auth h2,
+.upload-admin-section-head h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+}
+
+.upload-admin-workspace {
+  margin-top: 28px;
+}
+
+.upload-admin-section-head {
+  margin-bottom: 16px;
+}
+
+.upload-admin-password-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-admin-password-control input {
+  min-width: 0;
+}
+
+.upload-token-form small {
+  display: block;
+  margin-top: 7px;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.upload-admin-feedback {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(248, 113, 113, 0.34);
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.16);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.upload-admin-notice {
+  border-color: rgba(74, 222, 128, 0.34);
+  color: #dcfce7;
+  background: rgba(22, 101, 52, 0.18);
+}
+
 .upload-token-panel-head,
 .upload-token-form,
 .upload-token-create-row,
@@ -2658,6 +2784,37 @@ pre {
 }
 
 @media (max-width: 768px) {
+  .upload-admin-shell {
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
+
+  .upload-admin-page {
+    margin-top: 12px;
+  }
+
+  .upload-admin-page-head {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .upload-admin-page-head > .icon-btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .upload-admin-page h1 {
+    font-size: 28px;
+  }
+
+  .upload-admin-workspace {
+    margin-top: 24px;
+  }
+
+  .upload-admin-password-control input {
+    min-height: 44px;
+  }
+
   .settings-group {
     flex-direction: column;
   }
@@ -2675,5 +2832,56 @@ pre {
 
   .upload-token-days-field {
     flex-basis: auto !important;
+  }
+
+  .upload-token-table-wrap {
+    overflow: visible;
+    border: 0;
+  }
+
+  .upload-token-table,
+  .upload-token-table tbody,
+  .upload-token-table tr,
+  .upload-token-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .upload-token-table thead {
+    display: none;
+  }
+
+  .upload-token-table tr {
+    margin-top: 12px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.3);
+  }
+
+  .upload-token-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 40px;
+    padding: 7px 0;
+    white-space: normal;
+  }
+
+  .upload-token-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.48);
+    font-size: 12px;
+  }
+
+  .upload-token-table td:first-child {
+    align-items: flex-start;
+  }
+
+  .upload-token-table td:last-child {
+    border-bottom: 0;
   }
 }

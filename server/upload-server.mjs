@@ -19,10 +19,15 @@ const TTL_MS = Number(process.env.UPLOAD_TTL_MS || 12 * 60 * 60 * 1000)
 const CLEANUP_INTERVAL_MS = Number(process.env.UPLOAD_CLEANUP_INTERVAL_MS || 12 * 60 * 60 * 1000)
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), 'tmp-uploads'))
 const adminPassword = String(process.env.UPLOAD_ADMIN_PASSWORD || '')
+const adminMaxFailures = Math.max(1, Number(process.env.UPLOAD_ADMIN_MAX_FAILURES || 5) || 5)
+const adminFailureWindowMs = Math.max(1_000, Number(process.env.UPLOAD_ADMIN_FAILURE_WINDOW_MS || 15 * 60 * 1000) || 15 * 60 * 1000)
+const adminLockoutMs = Math.max(1_000, Number(process.env.UPLOAD_ADMIN_LOCKOUT_MS || 15 * 60 * 1000) || 15 * 60 * 1000)
+const adminFailureTrackerLimit = Math.max(100, Number(process.env.UPLOAD_ADMIN_FAILURE_TRACKER_LIMIT || 10_000) || 10_000)
 const requireExternalToken = String(process.env.UPLOAD_REQUIRE_TOKEN || 'true').toLowerCase() !== 'false'
 const tokenFile = path.resolve(process.env.UPLOAD_TOKEN_FILE || path.join(uploadDir, 'upload-tokens.json'))
 const corsOrigin = String(process.env.UPLOAD_CORS_ORIGIN || '')
 let tokenStore = { tokens: [] }
+const adminFailuresByIp = new Map()
 
 const uploadPolicies = {
   image: {
@@ -119,6 +124,47 @@ function safeEqual(left, right) {
   return a.length === b.length && crypto.timingSafeEqual(a, b)
 }
 
+function requestIp(req) {
+  const realIp = req.headers['x-real-ip']
+  const value = Array.isArray(realIp) ? realIp[0] : realIp
+  return String(value || req.socket.remoteAddress || 'unknown').split(',')[0].trim() || 'unknown'
+}
+
+function pruneAdminFailures(now = Date.now()) {
+  for (const [ip, record] of adminFailuresByIp) {
+    if ((record.lockedUntil && record.lockedUntil <= now) || (!record.lockedUntil && now - record.lastFailedAt > adminFailureWindowMs)) {
+      adminFailuresByIp.delete(ip)
+    }
+  }
+}
+
+function adminRequestAllowed(req, res) {
+  const record = adminFailuresByIp.get(requestIp(req))
+  if (!record?.lockedUntil || record.lockedUntil <= Date.now()) return true
+  const retryAfter = Math.max(1, Math.ceil((record.lockedUntil - Date.now()) / 1000))
+  res.setHeader('Retry-After', String(retryAfter))
+  json(res, 429, { error: `管理员登录尝试次数过多，请 ${retryAfter} 秒后再试`, retry_after: retryAfter })
+  return false
+}
+
+function recordAdminFailure(req) {
+  const now = Date.now()
+  const ip = requestIp(req)
+  const previous = adminFailuresByIp.get(ip)
+  const count = previous && now - previous.lastFailedAt <= adminFailureWindowMs
+    ? previous.count + 1
+    : 1
+  adminFailuresByIp.set(ip, {
+    count,
+    lastFailedAt: now,
+    lockedUntil: count >= adminMaxFailures ? now + adminLockoutMs : 0,
+  })
+  if (adminFailuresByIp.size > adminFailureTrackerLimit) {
+    const oldestIp = adminFailuresByIp.keys().next().value
+    if (oldestIp) adminFailuresByIp.delete(oldestIp)
+  }
+}
+
 function tokenIsActive(token) {
   return !token.revokedAt && (!token.expiresAt || Date.parse(token.expiresAt) > Date.now())
 }
@@ -208,11 +254,18 @@ async function requireUploadAccess(req, res) {
 }
 
 function requireAdmin(req, res) {
+  if (!adminPassword) {
+    json(res, 503, { error: '管理员服务未配置' })
+    return false
+  }
+  if (!adminRequestAllowed(req, res)) return false
   const supplied = String(req.headers['x-upload-admin-password'] || '')
-  if (!adminPassword || !safeEqual(supplied, adminPassword)) {
+  if (!safeEqual(supplied, adminPassword)) {
+    recordAdminFailure(req)
     json(res, 401, { error: '管理员密码错误' })
     return false
   }
+  adminFailuresByIp.delete(requestIp(req))
   return true
 }
 
@@ -533,6 +586,7 @@ const server = http.createServer(async (req, res) => {
 })
 
 setInterval(() => cleanupExpired().catch(() => {}), CLEANUP_INTERVAL_MS).unref()
+setInterval(() => pruneAdminFailures(), 60_000).unref()
 await loadTokenStore()
 await cleanupExpired()
 server.listen(PORT, HOST, () => console.log(`Temporary upload server listening on http://${HOST}:${PORT}`))

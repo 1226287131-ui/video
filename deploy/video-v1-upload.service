@@ -17,6 +17,9 @@ Environment=UPLOAD_TTL_MS=43200000
 Environment=UPLOAD_CLEANUP_INTERVAL_MS=43200000
 Environment=UPLOAD_REQUIRE_TOKEN=true
 Environment=UPLOAD_CORS_ORIGIN=*
+Environment=UPLOAD_ADMIN_MAX_FAILURES=5
+Environment=UPLOAD_ADMIN_FAILURE_WINDOW_MS=900000
+Environment=UPLOAD_ADMIN_LOCKOUT_MS=900000
 ExecStart=/usr/bin/node server/upload-server.mjs
 Restart=always
 RestartSec=5
