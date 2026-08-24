@@ -17,7 +17,10 @@ export const MINIMAX_H3_ASPECT_RATIOS = [
 ] as const
 
 export type MiniMaxH3AspectRatio = typeof MINIMAX_H3_ASPECT_RATIOS[number]
-export type MiniMaxH3VideoSize = `${number}x${number}`
+export type MiniMaxH3PixelSize = `${number}x${number}`
+export const MINIMAX_H3_SUPER_RESOLUTION_SIZES = ['2K', '4K'] as const
+export type MiniMaxH3SuperResolutionSize = typeof MINIMAX_H3_SUPER_RESOLUTION_SIZES[number]
+export type MiniMaxH3VideoSize = MiniMaxH3PixelSize | MiniMaxH3SuperResolutionSize
 
 /**
  * Fixed `size` presets exposed by the H3 editor.
@@ -27,7 +30,7 @@ export type MiniMaxH3VideoSize = `${number}x${number}`
  */
 export const MINIMAX_H3_STANDARD_SIZES_BY_RATIO: Record<
   MiniMaxH3AspectRatio,
-  readonly MiniMaxH3VideoSize[]
+  readonly MiniMaxH3PixelSize[]
 > = {
   '16:9': ['864x480', '1376x768', '1920x1088'],
   '9:16': ['480x864', '768x1376', '1088x1920'],
@@ -48,6 +51,7 @@ export const MINIMAX_H3_VIDEO_SIZES = [
   ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['3:4'],
   ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['4:3'],
   ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['21:9'],
+  ...MINIMAX_H3_SUPER_RESOLUTION_SIZES,
 ] as const
 
 export const MINIMAX_H3_DEFAULT_ASPECT_RATIO: MiniMaxH3AspectRatio = '16:9'
@@ -76,16 +80,22 @@ export const MINIMAX_H3_WORKFLOW_IDS = [
 
 export type MiniMaxH3WorkflowId = typeof MINIMAX_H3_WORKFLOW_IDS[number]
 export type MiniMaxH3WorkflowSelection = 'auto' | MiniMaxH3WorkflowId
-export type MiniMaxH3WorkflowSize = '2K' | '4K'
+/** @deprecated Use MiniMaxH3SuperResolutionSize and send it as `size`. */
+export type MiniMaxH3WorkflowSize = MiniMaxH3SuperResolutionSize
 export const MINIMAX_H3_DEFAULT_WORKFLOW_ID: MiniMaxH3WorkflowId = 'multi-reference'
-export const MINIMAX_H3_WORKFLOW_SIZES: readonly MiniMaxH3WorkflowSize[] = ['2K', '4K']
+/** @deprecated Use MINIMAX_H3_SUPER_RESOLUTION_SIZES. */
+export const MINIMAX_H3_WORKFLOW_SIZES = MINIMAX_H3_SUPER_RESOLUTION_SIZES
 
 export function isValidMiniMaxH3WorkflowId(value: unknown): value is MiniMaxH3WorkflowId {
   return typeof value === 'string' && (MINIMAX_H3_WORKFLOW_IDS as readonly string[]).includes(value)
 }
 
 export function isValidMiniMaxH3WorkflowSize(value: unknown): value is MiniMaxH3WorkflowSize {
-  return typeof value === 'string' && (MINIMAX_H3_WORKFLOW_SIZES as readonly string[]).includes(value)
+  return isMiniMaxH3SuperResolutionSize(value)
+}
+
+export function isMiniMaxH3SuperResolutionSize(value: unknown): value is MiniMaxH3SuperResolutionSize {
+  return typeof value === 'string' && (MINIMAX_H3_SUPER_RESOLUTION_SIZES as readonly string[]).includes(value)
 }
 
 export function inferMiniMaxH3WorkflowId(input: {
@@ -213,7 +223,10 @@ export function getMiniMaxH3VideoSizesForAspectRatio(ratio: unknown) {
   const normalizedRatio = isValidMiniMaxH3AspectRatio(ratio)
     ? ratio
     : MINIMAX_H3_DEFAULT_ASPECT_RATIO
-  return MINIMAX_H3_STANDARD_SIZES_BY_RATIO[normalizedRatio]
+  return [
+    ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO[normalizedRatio],
+    ...MINIMAX_H3_SUPER_RESOLUTION_SIZES,
+  ] as const
 }
 
 export function isValidMiniMaxH3VideoSeconds(value: unknown): value is number {
@@ -227,7 +240,9 @@ export function isValidMiniMaxH3VideoSeconds(value: unknown): value is number {
 
 export function isValidMiniMaxH3VideoSize(value: unknown): value is MiniMaxH3VideoSize {
   if (typeof value !== 'string') return false
-  const match = /^(\d+)x(\d+)$/.exec(value.trim())
+  const normalizedValue = value.trim()
+  if (isMiniMaxH3SuperResolutionSize(normalizedValue)) return true
+  const match = /^(\d+)x(\d+)$/.exec(normalizedValue)
   if (!match) return false
   const width = Number(match[1])
   const height = Number(match[2])

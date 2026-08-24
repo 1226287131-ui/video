@@ -27,14 +27,14 @@ const form = {
 }
 
 const fixedMiniMaxH3SizesByRatio = {
-  '16:9': ['864x480', '1376x768', '1920x1088'],
-  '9:16': ['480x864', '768x1376', '1088x1920'],
-  '1:1': ['640x640', '1024x1024', '1440x1440'],
-  '2:3': ['544x800', '832x1248', '1184x1760'],
-  '3:2': ['800x544', '1248x832', '1760x1184'],
-  '3:4': ['576x736', '896x1184', '1248x1664'],
-  '4:3': ['736x576', '1184x896', '1664x1248'],
-  '21:9': ['992x416', '1568x672', '2208x960'],
+  '16:9': ['864x480', '1376x768', '1920x1088', '2K', '4K'],
+  '9:16': ['480x864', '768x1376', '1088x1920', '2K', '4K'],
+  '1:1': ['640x640', '1024x1024', '1440x1440', '2K', '4K'],
+  '2:3': ['544x800', '832x1248', '1184x1760', '2K', '4K'],
+  '3:2': ['800x544', '1248x832', '1760x1184', '2K', '4K'],
+  '3:4': ['576x736', '896x1184', '1248x1664', '2K', '4K'],
+  '4:3': ['736x576', '1184x896', '1664x1248', '2K', '4K'],
+  '21:9': ['992x416', '1568x672', '2208x960', '2K', '4K'],
 }
 
 test('compiles MiniMax-H3 media mentions into explicit array-order instructions', () => {
@@ -125,10 +125,12 @@ test('recognizes and validates the MiniMax-H3 contract', () => {
     assert.equal(isValidMiniMaxH3AspectRatio(ratio), true)
     assert.deepEqual(getMiniMaxH3VideoSizesForAspectRatio(ratio), fixedMiniMaxH3SizesByRatio[ratio])
   }
-  assert.equal(MINIMAX_H3_VIDEO_SIZES.length, 24)
+  assert.equal(MINIMAX_H3_VIDEO_SIZES.length, 26)
   assert.equal(isValidMiniMaxH3AspectRatio('auto'), false)
   assert.equal(isValidMiniMaxH3VideoSize('1920x1088'), true)
   assert.equal(isValidMiniMaxH3VideoSize('1376x768'), true)
+  assert.equal(isValidMiniMaxH3VideoSize('2K'), true)
+  assert.equal(isValidMiniMaxH3VideoSize('4K'), true)
   assert.equal(isValidMiniMaxH3VideoSize('not-a-size'), false)
   for (const multiple of [8, 16, 128]) assert.equal(isValidMiniMaxH3Multiple(multiple), true)
   for (const multiple of [4, 10, 132, 9]) assert.equal(isValidMiniMaxH3Multiple(multiple), false)
@@ -269,13 +271,22 @@ test('automatically selects H3 workflow_id from the submitted media', () => {
   assert.equal(referencePayload.workflow_id, 'multi-reference')
 })
 
-test('supports explicit H3 super-resolution workflows and validates their size', () => {
+test('sends direct H3 2K/4K size values and requires them for cf workflows', () => {
+  const standardWorkflowPayload = buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '4K 文生视频',
+    seconds: 5,
+    size: '4K',
+  })
+  assert.equal(standardWorkflowPayload.workflow_id, 'text-to-video')
+  assert.equal(standardWorkflowPayload.size, '4K')
+
   const payload = buildMiniMaxH3SubmitPayload({
     model: 'MiniMax-H3',
     prompt: '超分参考图',
     seconds: 5,
     workflow_id: 'cf-multi-reference',
-    workflow_size: '4K',
+    size: '4K',
     images: ['https://example.com/a.jpg'],
   })
   assert.equal(payload.workflow_id, 'cf-multi-reference')

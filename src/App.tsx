@@ -88,11 +88,11 @@ import {
   MINIMAX_H3_DEFAULT_SIZE,
   MINIMAX_H3_DEFAULT_SECONDS,
   MINIMAX_H3_WORKFLOW_IDS,
-  MINIMAX_H3_WORKFLOW_SIZES,
   inferMiniMaxH3WorkflowId,
   type MiniMaxH3WorkflowId,
   type MiniMaxH3WorkflowSelection,
   type MiniMaxH3WorkflowSize,
+  isMiniMaxH3SuperResolutionSize,
   isValidMiniMaxH3VideoSeconds,
   isValidMiniMaxH3VideoSize,
   normalizeMiniMaxH3Mentions,
@@ -223,7 +223,6 @@ type FormState = {
   resolution: VideoResolution
   size: VideoSize
   miniMaxWorkflow: MiniMaxH3WorkflowSelection
-  miniMaxWorkflowSize: MiniMaxH3WorkflowSize
   videoV3Size: string
   generateAudio: boolean
   seed: number | ''
@@ -346,7 +345,6 @@ const initialForm: FormState = {
   resolution: '480p',
   size: MINIMAX_H3_DEFAULT_SIZE,
   miniMaxWorkflow: 'auto',
-  miniMaxWorkflowSize: '2K',
   videoV3Size: '',
   generateAudio: true,
   seed: '',
@@ -889,9 +887,10 @@ function VideoStudioApp() {
         ratio: parsed.ratio ?? current.ratio,
         quality: parsed.quality ?? current.quality,
         resolution: parsed.resolution ?? current.resolution,
-        size: parsed.size ?? current.size,
+        size: isMiniMaxH3SuperResolutionSize(parsed.workflow_size)
+          ? parsed.workflow_size
+          : parsed.size ?? current.size,
         miniMaxWorkflow: parsed.workflow_id ?? current.miniMaxWorkflow,
-        miniMaxWorkflowSize: parsed.workflow_size ?? current.miniMaxWorkflowSize,
         videoV3Size: parsed.video_v3_size ?? current.videoV3Size,
         startFrameUrl: parsed.start_frame_url ?? current.startFrameUrl,
         endFrameUrl: parsed.end_frame_url ?? current.endFrameUrl,
@@ -1136,6 +1135,16 @@ function VideoStudioApp() {
       const nextSize = nextSizes[Math.min(currentSizeIndex, nextSizes.length - 1)] ?? MINIMAX_H3_DEFAULT_SIZE
       return { ...current, ratio: nextRatio, size: nextSize }
     })
+  }
+
+  function updateMiniMaxWorkflow(nextWorkflow: MiniMaxH3WorkflowSelection) {
+    setForm((current) => ({
+      ...current,
+      miniMaxWorkflow: nextWorkflow,
+      size: nextWorkflow.startsWith('cf-') && !isMiniMaxH3SuperResolutionSize(current.size)
+        ? '2K'
+        : current.size,
+    }))
   }
 
   function changeVideoV3Protocol(nextProtocol: VideoV3Protocol) {
@@ -2135,13 +2144,15 @@ function VideoStudioApp() {
                 ? item.ratio
                 : MINIMAX_H3_DEFAULT_ASPECT_RATIO
               const sizes = getMiniMaxH3VideoSizesForAspectRatio(ratio)
-              return sizes.includes(item.size as MiniMaxH3VideoSize)
-                ? item.size as MiniMaxH3VideoSize
+              const savedSize = isMiniMaxH3SuperResolutionSize(item.workflow_size)
+                ? item.workflow_size
+                : item.size
+              return sizes.includes(savedSize as MiniMaxH3VideoSize)
+                ? savedSize as MiniMaxH3VideoSize
                 : sizes[sizes.length - 1] ?? MINIMAX_H3_DEFAULT_SIZE
             })()
           : item.size ?? current.size,
         miniMaxWorkflow: item.workflow_id ?? current.miniMaxWorkflow,
-        miniMaxWorkflowSize: item.workflow_size ?? current.miniMaxWorkflowSize,
         videoV3Size: item.video_v3_size ?? current.videoV3Size,
         startFrameUrl: item.start_frame_url ?? current.startFrameUrl,
         endFrameUrl: item.end_frame_url ?? current.endFrameUrl,
@@ -2754,7 +2765,6 @@ function VideoStudioApp() {
             seconds: formSnapshot.duration,
             size: formSnapshot.size,
             workflowId: formSnapshot.miniMaxWorkflow,
-            workflowSize: formSnapshot.miniMaxWorkflow.startsWith('cf-') ? formSnapshot.miniMaxWorkflowSize : undefined,
             images: referenceUrls,
             referenceVideos: referenceVideoUrls,
             referenceAudios: referenceAudioUrls,
@@ -2901,7 +2911,6 @@ function VideoStudioApp() {
           generate_audio: useVideoResourceApi ? formSnapshot.generateAudio : undefined,
           size: useMiniMaxApi ? formSnapshot.size : undefined,
           workflow_id: useMiniMaxApi ? resolvedMiniMaxWorkflowId : undefined,
-          workflow_size: useMiniMaxApi && formSnapshot.miniMaxWorkflow.startsWith('cf-') ? formSnapshot.miniMaxWorkflowSize : undefined,
           video_v3_size: useVideoV3Api ? formSnapshot.videoV3Size.trim() || undefined : undefined,
           start_frame_url: useVideoV3Api ? formSnapshot.startFrameUrl.trim() || undefined : undefined,
           end_frame_url: useVideoV3Api ? formSnapshot.endFrameUrl.trim() || undefined : undefined,
@@ -3818,9 +3827,10 @@ function VideoStudioApp() {
                 </button>
                 <button 
                   type="button" 
-                  className="secondary-btn"
+                  className="secondary-btn console-settings-toggle"
                   onClick={() => setShowSettings(!showSettings)}
-                  style={{ height: '40px', borderRadius: '16px' }}
+                  aria-expanded={showSettings}
+                  aria-controls="generation-settings"
                 >
                   <Settings2 size={16} /> 
                   {showSettings ? '收起配置' : '展开配置'}
@@ -3830,34 +3840,39 @@ function VideoStudioApp() {
 
             {/* 展开的选项与配置区域 */}
             {showSettings && (
-              <div className="console-settings-panel" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px', marginTop: '8px' }}>
-              
-              <div className="options-grid">
-                
-                {/* 鉴权配置 */}
-                <div className="settings-group" style={{ gridColumn: '1 / -1', display: 'flex', gap: '16px' }}>
-                  <div className="field" style={{ flex: 1 }}>
-                    <div className="options-group-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <section id="generation-settings" className="console-settings-panel" aria-label="请求配置">
+                <div className="settings-panel-heading">
+                  <span className="settings-panel-title"><Settings2 size={16} /> 请求配置</span>
+                </div>
+
+                <section className="settings-section settings-section--connection" aria-labelledby="connection-settings-title">
+                  <header className="settings-section-header">
+                    <h3 id="connection-settings-title" className="settings-section-title"><KeyRound size={15} /> 接入与模型</h3>
+                  </header>
+                  <div className="settings-section-grid settings-section-grid--connection">
+                  <div className="field settings-field">
+                    <label className="options-group-label" htmlFor="base-api-key">
                       <KeyRound size={14} /> Base API Key
-                    </div>
+                    </label>
                     <input
+                      id="base-api-key"
                       type="password"
                       placeholder="sk-..."
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      style={{ padding: '12px 16px', borderRadius: '14px', background: 'rgba(0,0,0,0.3)' }}
                     />
                   </div>
                   
-                  <div className="field" style={{ flex: 1 }}>
-                    <div className="options-group-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <div className="field settings-field">
+                    <label className="options-group-label" htmlFor="video-model">
                       <Cpu size={14} /> 视频生成引擎
                       {loadingModels && <LoaderCircle className="spin" size={12} style={{ marginLeft: 6, opacity: 0.5 }}/>}
-                    </div>
+                    </label>
                     {models.length > 0 ? (
                        <select 
-                         className="model-select"
-                         value={form.model}
+                          id="video-model"
+                          className="model-select"
+                          value={form.model}
                          onChange={(e) => changeModel(e.target.value)}
                        >
                          {models.map(m => (
@@ -3865,18 +3880,24 @@ function VideoStudioApp() {
                          ))}
                        </select>
                     ) : (
-                      <input 
+                       <input
+                        id="video-model"
                         type="text"
                         value={form.model}
                         onChange={(e) => changeModel(e.target.value)}
                         placeholder="填入API Key自动拉取，或手动指定模型"
-                        style={{ padding: '12px 16px', borderRadius: '14px', background: 'rgba(0,0,0,0.3)' }}
                       />
                     )}
                   </div>
-                </div>
+                  </div>
+                </section>
 
-                <div className={`options-group ${grokModelSelected ? 'grok-option-group' : ''}`} style={{ marginTop: 8 }}>
+                <section className="settings-section settings-section--base" aria-labelledby="base-generation-settings-title">
+                  <header className="settings-section-header">
+                    <h3 id="base-generation-settings-title" className="settings-section-title"><Clock size={15} /> 基础生成</h3>
+                  </header>
+                  <div className="settings-section-grid settings-section-grid--base">
+                <div className={`options-group ${grokModelSelected ? 'grok-option-group' : ''}`}>
                   <span className="options-group-label"><Clock size={14} /> 渲染时长</span>
                   {miniMaxModelSelected ? (
                     <div className="minimax-duration-control">
@@ -3944,7 +3965,7 @@ function VideoStudioApp() {
                 </div>
 
                 {!miniMaxModelSelected && (
-                  <div className={`options-group ${grokModelSelected ? 'grok-option-group' : ''}`} style={{ marginTop: 8 }}>
+                  <div className={`options-group ${grokModelSelected ? 'grok-option-group' : ''}`}>
                     <span className="options-group-label"><Layout size={14} /> 裁切画幅</span>
                     <div className="segmented">
                       {visibleRatioPresets.map((val) => (
@@ -3960,10 +3981,18 @@ function VideoStudioApp() {
                     </div>
                   </div>
                 )}
-                
+                  </div>
+                </section>
+
+                <section className="settings-section settings-section--model" aria-labelledby="model-settings-title">
+                  <header className="settings-section-header">
+                    <h3 id="model-settings-title" className="settings-section-title"><Cpu size={15} /> 模型专属参数</h3>
+                  </header>
+                  <div className="settings-section-grid settings-section-grid--model">
+
                 {miniMaxModelSelected ? (
                   <>
-                    <div className="options-group minimax-option-group" style={{ marginTop: 8 }}>
+                    <div className="options-group minimax-option-group">
                       <label className="options-group-label" htmlFor="minimax-aspect-ratio"><Layout size={14} /> 画幅</label>
                       <select
                         id="minimax-aspect-ratio"
@@ -3974,49 +4003,42 @@ function VideoStudioApp() {
                         {MINIMAX_H3_ASPECT_RATIOS.map((ratio) => <option key={ratio} value={ratio}>{ratio}</option>)}
                       </select>
                     </div>
-                    <div className="options-group minimax-option-group" style={{ marginTop: 8 }}>
-                      <label className="options-group-label" htmlFor="minimax-size"><Settings2 size={14} /> 输出分辨率</label>
+                    <div className="options-group minimax-option-group">
+                      <label className="options-group-label" htmlFor="minimax-size"><Settings2 size={14} /> 输出尺寸</label>
                       <select
                         id="minimax-size"
                         className="minimax-select"
                         value={form.size}
                         onChange={(event) => updateField('size', event.target.value as VideoSize)}
                       >
-                        {[...new Set(miniMaxSizeOptions)].map((size) => <option key={size} value={size}>{size}</option>)}
+                        <optgroup label="固定分辨率">
+                          {miniMaxSizeOptions.filter((size) => !isMiniMaxH3SuperResolutionSize(size)).map((size) => <option key={size} value={size}>{size}</option>)}
+                        </optgroup>
+                        <optgroup label="超分尺寸">
+                          {miniMaxSizeOptions.filter(isMiniMaxH3SuperResolutionSize).map((size) => <option key={size} value={size}>{size}</option>)}
+                        </optgroup>
                       </select>
-                      <span className="field-hint">已按当前画幅列出全部可选尺寸。提交时仅发送该尺寸，其余高级参数由上游默认处理。</span>
+                      <span className="field-hint">每个画幅均提供固定分辨率及 2K/4K。提交时直接发送 size，其余高级参数由上游默认处理。</span>
                     </div>
-                    <div className="options-group minimax-option-group" style={{ marginTop: 8 }}>
+                    <div className="options-group minimax-option-group">
                       <label className="options-group-label" htmlFor="minimax-workflow"><Settings2 size={14} /> workflow_id</label>
                       <select
                         id="minimax-workflow"
                         className="minimax-select"
                         value={form.miniMaxWorkflow}
-                        onChange={(event) => updateField('miniMaxWorkflow', event.target.value as MiniMaxH3WorkflowSelection)}
+                        onChange={(event) => updateMiniMaxWorkflow(event.target.value as MiniMaxH3WorkflowSelection)}
                       >
                         <option value="auto">自动选择（推荐）</option>
                         {MINIMAX_H3_WORKFLOW_IDS.map((workflow) => <option key={workflow} value={workflow}>{workflow}</option>)}
                       </select>
                       <span className="field-hint">
-                        自动规则：无素材使用 text-to-video；有参考图/视频/音频使用 multi-reference。cf-* 超分和 mj 漫剧模式需要手动选择。
+                        自动规则：无素材使用 text-to-video；有参考图/视频/音频使用 multi-reference。选择 cf-* 时会自动切换为 2K，可在输出尺寸中改为 4K。
                       </span>
                     </div>
-                    {form.miniMaxWorkflow.startsWith('cf-') && <div className="options-group minimax-option-group" style={{ marginTop: 8 }}>
-                      <label className="options-group-label" htmlFor="minimax-workflow-size"><Settings2 size={14} /> 超分尺寸</label>
-                      <select
-                        id="minimax-workflow-size"
-                        className="minimax-select"
-                        value={form.miniMaxWorkflowSize}
-                        onChange={(event) => updateField('miniMaxWorkflowSize', event.target.value as MiniMaxH3WorkflowSize)}
-                      >
-                        {MINIMAX_H3_WORKFLOW_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
-                      </select>
-                      <span className="field-hint">cf-multi-reference、cf-fl2v、cf-mj 仅支持 2K 或 4K。</span>
-                    </div>}
                   </>
                 ) : videoV3ModelSelected ? (
                   <>
-                    <div className="options-group" style={{ marginTop: 8 }}>
+                    <div className="options-group">
                       <span className="options-group-label"><Settings2 size={14} /> 请求协议</span>
                       <div className="segmented">
                         <button
@@ -4035,7 +4057,7 @@ function VideoStudioApp() {
                         </button>
                       </div>
                     </div>
-                    <div className="options-group" style={{ marginTop: 8 }}>
+                    <div className="options-group">
                       <span className="options-group-label"><Settings2 size={14} /> 输出清晰度</span>
                       {form.videoV3Protocol === 'qy' ? (
                         <div className="segmented">
@@ -4053,7 +4075,7 @@ function VideoStudioApp() {
                       ) : <span className="badge">固定 {VIDEO_V3_DEFAULT_RESOLUTION}</span>}
                     </div>
                     {form.videoV3Protocol === 'qy' && <>
-                    <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
+                    <div className="options-group video-v3-advanced-group">
                       <label className="options-group-label" htmlFor="video-v3-size"><Settings2 size={14} /> 输出尺寸（可选）</label>
                       <input
                         id="video-v3-size"
@@ -4063,7 +4085,7 @@ function VideoStudioApp() {
                         placeholder="例如 1280x720"
                       />
                     </div>
-                    <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
+                    <div className="options-group video-v3-advanced-group">
                       <label className="options-group-label" htmlFor="video-v3-start-frame"><Settings2 size={14} /> 首帧 URL（可选）</label>
                       <input
                         id="video-v3-start-frame"
@@ -4073,7 +4095,7 @@ function VideoStudioApp() {
                         placeholder="https://..."
                       />
                     </div>
-                    <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
+                    <div className="options-group video-v3-advanced-group">
                       <label className="options-group-label" htmlFor="video-v3-end-frame"><Settings2 size={14} /> 尾帧 URL（可选）</label>
                       <input
                         id="video-v3-end-frame"
@@ -4085,7 +4107,7 @@ function VideoStudioApp() {
                       <span className="field-hint">首尾帧 URL 不能与参考图片同时使用，可与参考视频或音频组合。</span>
                     </div>
                     </>}
-                    <div className="options-group" style={{ marginTop: 8 }}>
+                    <div className="options-group">
                       <span className="options-group-label"><Settings2 size={14} /> 生成音频</span>
                       <div className="segmented">
                         <button
@@ -4104,7 +4126,7 @@ function VideoStudioApp() {
                         </button>
                       </div>
                     </div>
-                    <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
+                    <div className="options-group video-v3-advanced-group">
                       <label className="options-group-label" htmlFor="video-v3-seed"><Settings2 size={14} /> 随机种子（可选）</label>
                       <input
                         id="video-v3-seed"
@@ -4116,7 +4138,7 @@ function VideoStudioApp() {
                         placeholder="留空随机"
                       />
                     </div>
-                    <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
+                    <div className="options-group video-v3-advanced-group">
                       <label className="options-group-label" htmlFor="video-v3-grid-strength"><Settings2 size={14} /> 素材融合强度（可选）</label>
                       <input
                         id="video-v3-grid-strength"
@@ -4130,7 +4152,7 @@ function VideoStudioApp() {
                         placeholder={form.videoV3Protocol === 'qy' ? '0.01-0.5' : '0-1'}
                       />
                     </div>
-                    <div className="options-group video-v3-advanced-group" style={{ marginTop: 8 }}>
+                    <div className="options-group video-v3-advanced-group">
                       <label className="video-v3-toggle" htmlFor="video-v3-bypass-face-check">
                         <input
                           id="video-v3-bypass-face-check"
@@ -4144,7 +4166,7 @@ function VideoStudioApp() {
                   </>
                 ) : videoV2ModelSelected ? (
                   <>
-                    <div className="options-group" style={{ marginTop: 8 }}>
+                    <div className="options-group">
                       <span className="options-group-label"><Settings2 size={14} /> 输出清晰度</span>
                       <div className="segmented">
                         {videoResolutionPresets.map((val) => (
@@ -4159,7 +4181,7 @@ function VideoStudioApp() {
                         ))}
                       </div>
                     </div>
-                    <div className="options-group" style={{ marginTop: 8 }}>
+                    <div className="options-group">
                       <span className="options-group-label"><Settings2 size={14} /> 生成音频</span>
                       <div className="segmented">
                         <button
@@ -4180,7 +4202,7 @@ function VideoStudioApp() {
                     </div>
                   </>
                 ) : grokModelSelected ? (
-                  <div className="options-group grok-option-group" style={{ marginTop: 8 }}>
+                  <div className="options-group grok-option-group">
                     <span className="options-group-label"><Settings2 size={14} /> {grokUsesMultipleReferences ? '输出清晰度（多参考图）' : '输出清晰度'}</span>
                     <div className="segmented">
                       {visibleGrokResolutionPresets.map((val) => (
@@ -4197,7 +4219,7 @@ function VideoStudioApp() {
                     {grokUsesMultipleReferences && <span className="field-hint">多张参考图仅支持 480p 或 720p。</span>}
                   </div>
                 ) : (
-                  <div className="options-group" style={{ marginTop: 8 }}>
+                  <div className="options-group">
                     <span className="options-group-label"><Settings2 size={14} /> 纹理质感</span>
                     <div className="segmented">
                       {qualityPresets.map((val) => (
@@ -4214,9 +4236,10 @@ function VideoStudioApp() {
                   </div>
                 )}
 
-              </div>
+                  </div>
+                </section>
 
-              </div>
+              </section>
             )}
           </div>
         </form>

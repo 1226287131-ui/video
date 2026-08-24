@@ -4,6 +4,7 @@ import {
   isValidMiniMaxH3Multiple,
   isValidMiniMaxH3VideoSeconds,
   isValidMiniMaxH3VideoSize,
+  isMiniMaxH3SuperResolutionSize,
   inferMiniMaxH3WorkflowId,
   isValidMiniMaxH3WorkflowId,
   isValidMiniMaxH3WorkflowSize,
@@ -442,11 +443,12 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
     throw new Error('MiniMax-H3 的超分 size 只能是 2K 或 4K')
   }
   const usesSuperResolution = workflowId.startsWith('cf-')
-  if (usesSuperResolution && !workflowSize) {
+  const effectiveSize = workflowSize ?? size
+  if (usesSuperResolution && !isMiniMaxH3SuperResolutionSize(effectiveSize)) {
     throw new Error('MiniMax-H3 的 cf 工作流必须选择 2K 或 4K size')
   }
   if (!usesSuperResolution && workflowSize) {
-    throw new Error('MiniMax-H3 的 2K/4K size 仅适用于 cf 工作流')
+    throw new Error('MiniMax-H3 请使用 size 传入 2K 或 4K，不要发送 workflow_size')
   }
   if (workflowId === 'text-to-video' && (images.length || referenceVideos.length || referenceAudios.length || referenceVideoAudios.length)) {
     throw new Error('MiniMax-H3 的 text-to-video 工作流不能携带参考素材')
@@ -478,8 +480,7 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
   }
   if (hasDuration || !hasSeconds) payload.duration = normalizedDuration
   else payload.seconds = normalizedDuration
-  if (workflowSize) payload.size = workflowSize
-  else if (size) payload.size = size
+  if (effectiveSize) payload.size = effectiveSize
   if (input.mode) payload.mode = input.mode
   if (input.audio !== undefined) payload.audio = input.audio
   if (promptEnhance !== undefined) payload.prompt_enhance = promptEnhance

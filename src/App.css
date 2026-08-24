@@ -386,21 +386,21 @@ pre {
   bottom: 32px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(800px, calc(100% - 48px));
+  width: min(1040px, calc(100% - 48px));
   max-height: calc(100dvh - 64px);
   box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 32px;
-  padding: 24px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+  background: rgba(12, 18, 32, 0.94);
+  backdrop-filter: blur(18px) saturate(135%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   z-index: 100;
-  transition: width 0.25s ease, padding 0.25s ease, border-radius 0.25s ease;
+  transition: width 0.2s ease, padding 0.2s ease, border-radius 0.2s ease;
 }
 
 .console-form {
@@ -413,26 +413,27 @@ pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 30px;
+  min-height: 36px;
 }
 
 .console-title {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: rgba(255, 255, 255, 0.48);
-  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .console-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  border-radius: 8px;
   color: rgba(255, 255, 255, 0.7);
   background: rgba(255, 255, 255, 0.06);
   cursor: pointer;
@@ -461,8 +462,8 @@ pre {
   width: min(360px, calc(100% - 48px));
   max-height: none;
   overflow: visible;
-  padding: 10px 14px;
-  border-radius: 16px;
+  padding: 8px 12px;
+  border-radius: 12px;
 }
 
 .floating-console.is-collapsed .console-collapsible {
@@ -2326,12 +2327,215 @@ pre {
     grid-column: auto;
   }
 }
-/* App.css 增量样式，匹配新加的设置面板 */
-
-.options-grid {
+/* 生成配置：按接入、基础参数和模型专属参数分层展示。 */
+.console-settings-panel {
   display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 2px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  animation: settings-panel-enter 180ms ease-out;
+}
+
+@keyframes settings-panel-enter {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.settings-panel-heading {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 0 10px;
+}
+
+.settings-panel-title,
+.settings-section-title,
+.settings-section .options-group-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.settings-panel-title {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.settings-section {
+  min-width: 0;
+  padding: 16px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-section--connection {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  margin-bottom: 10px;
+}
+
+.settings-section-title {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.settings-section-title svg,
+.settings-section .options-group-label svg {
+  color: #a5b4fc;
+}
+
+.settings-section-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-section-grid--connection > .settings-field {
+  grid-column: span 6;
+}
+
+.settings-section-grid--base > .options-group {
+  grid-column: span 6;
+}
+
+.settings-section-grid--model > .options-group {
+  grid-column: span 4;
+  min-width: 0;
+}
+
+.settings-section-grid--model > .grok-option-group {
+  grid-column: 1 / -1;
+}
+
+.settings-section .field,
+.settings-section .options-group {
+  min-width: 0;
+  margin: 0;
+}
+
+.settings-section .options-group {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-section .options-group-label {
+  min-height: 20px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.4;
+}
+
+.settings-section .field-hint {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.44);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.settings-section .segmented {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.settings-section .segmented-item {
+  min-height: 40px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+}
+
+.settings-section .segmented-item:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.settings-section .segmented-item.is-active {
+  color: #fff;
+  background: rgba(99, 102, 241, 0.3);
+  box-shadow: inset 0 0 0 1px rgba(165, 180, 252, 0.2);
+}
+
+.settings-section .segmented-item:focus-visible {
+  outline: 2px solid rgba(165, 180, 252, 0.78);
+  outline-offset: 1px;
+}
+
+.settings-section .minimax-select,
+.settings-section .video-v3-number-control,
+.settings-section .video-v3-advanced-group input,
+.settings-field input,
+.settings-field .model-select {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.settings-field input,
+.settings-field .model-select {
+  padding: 10px 12px;
+}
+
+.settings-section .minimax-select,
+.settings-section .video-v3-advanced-group input {
+  padding: 10px 12px;
+}
+
+.settings-section .video-v3-number-control {
+  justify-content: space-between;
+  padding: 5px 8px 5px 12px;
+}
+
+.settings-section .video-v3-number-control input {
+  min-height: 32px;
+  border-radius: 5px;
+}
+
+.settings-section .minimax-duration-control {
+  width: 100%;
+  flex-basis: auto;
+}
+
+.settings-section .minimax-duration-shortcuts {
+  align-self: stretch;
+}
+
+.settings-section .minimax-duration-shortcuts .segmented-item {
+  flex: 1;
+}
+
+.settings-section .video-v3-toggle {
+  min-height: 44px;
+  padding: 0 2px;
+}
+
+.console-settings-toggle {
+  min-height: 44px;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .model-select {
@@ -2898,5 +3102,70 @@ pre {
 
   .upload-token-table td:last-child {
     border-bottom: 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .floating-console {
+    width: min(780px, calc(100% - 32px));
+  }
+
+  .settings-section-grid--model > .options-group {
+    grid-column: span 6;
+  }
+
+  .settings-section-grid--model > .grok-option-group {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .floating-console {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: calc(100% - 16px);
+    max-height: calc(100dvh - 16px - env(safe-area-inset-bottom));
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .console-settings-panel {
+    padding-top: 14px;
+  }
+
+  .settings-section {
+    padding-top: 14px;
+  }
+
+  .settings-section-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .settings-section-grid--connection > .settings-field,
+  .settings-section-grid--base > .options-group,
+  .settings-section-grid--model > .options-group,
+  .settings-section-grid--model > .grok-option-group {
+    grid-column: 1;
+  }
+
+  .settings-section .segmented {
+    width: 100%;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+  }
+
+  .settings-section .segmented-item {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .settings-section .minimax-duration-shortcuts .segmented-item {
+    flex: 1 1 56px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .console-settings-panel {
+    animation: none;
   }
 }
