@@ -175,6 +175,7 @@ type TaskRecord = {
   created_at: number
   duration?: VideoDuration
   ratio?: VideoRatio
+  aspect_ratio?: MiniMaxH3AspectRatio
   quality?: VideoQuality
   resolution?: VideoResolution
   generate_audio?: boolean
@@ -785,6 +786,7 @@ function VideoStudioApp() {
     ? form.ratio
     : MINIMAX_H3_DEFAULT_ASPECT_RATIO
   const miniMaxSizeOptions = getMiniMaxH3VideoSizesForAspectRatio(miniMaxAspectRatio)
+  const miniMaxSuperResolutionSelected = miniMaxModelSelected && isMiniMaxH3SuperResolutionSize(form.size)
   const mediaResourceModelSelected = videoResourceModelSelected || miniMaxModelSelected
   const grokUsesMultipleReferences = grokModelSelected && mode === 'image' && uniqueUploadedAssetsById(grokReferenceImages).length > 1
   const videoV2MediaLimits = miniMaxModelSelected
@@ -2895,6 +2897,10 @@ function VideoStudioApp() {
               : 'queued'
         const resultUrl = createdTask.resultUrl
         const initialProgress = createdTask.progress
+        const submittedPayload = plan.payload as Record<string, unknown>
+        const submittedMiniMaxAspectRatio = useMiniMaxApi && isValidMiniMaxH3AspectRatio(submittedPayload.aspect_ratio)
+          ? submittedPayload.aspect_ratio
+          : undefined
         const newTask: TaskRecord = {
           id: createdTask.id,
           task_id: taskId,
@@ -2907,6 +2913,7 @@ function VideoStudioApp() {
           duration: formSnapshot.duration,
           seconds: useMiniMaxApi ? formSnapshot.duration : undefined,
           ratio: formSnapshot.ratio,
+          aspect_ratio: submittedMiniMaxAspectRatio,
           quality: formSnapshot.quality,
           resolution: useGrokApi ? formSnapshot.resolution : useVideoV3Api ? formSnapshot.resolution : useVideoV2Api ? formSnapshot.resolution : undefined,
           generate_audio: useVideoResourceApi ? formSnapshot.generateAudio : undefined,
@@ -4019,7 +4026,11 @@ function VideoStudioApp() {
                           {miniMaxSizeOptions.filter(isMiniMaxH3SuperResolutionSize).map((size) => <option key={size} value={size}>{size}</option>)}
                         </optgroup>
                       </select>
-                      <span className="field-hint">每个画幅均提供固定分辨率及 2K/4K。选择 2K/4K 时会同时发送当前画幅的 aspect_ratio。</span>
+                      {miniMaxSuperResolutionSelected ? (
+                        <span className="field-hint">本次实际请求：size={form.size}，aspect_ratio={miniMaxAspectRatio}。</span>
+                      ) : (
+                        <span className="field-hint">每个画幅均提供固定分辨率及 2K/4K；选择 2K/4K 时会同时发送当前画幅的 aspect_ratio。</span>
+                      )}
                     </div>
                     <div className="options-group minimax-option-group">
                       <label className="options-group-label" htmlFor="minimax-workflow"><Settings2 size={14} /> workflow_id</label>
@@ -4308,6 +4319,9 @@ function VideoStudioApp() {
                 <div><dt>视频时长</dt><dd>{(detailTask.seconds ?? detailTask.duration) ? `${detailTask.seconds ?? detailTask.duration} 秒` : '-'}</dd></div>
                 {!isMiniMaxH3VideoModel(detailTask.model) && <div><dt>画幅</dt><dd>{detailTask.ratio ?? '-'}</dd></div>}
                 <div><dt>输出规格</dt><dd>{isMiniMaxH3VideoModel(detailTask.model) ? detailTask.size ?? '-' : detailTask.resolution ?? detailTask.quality?.toUpperCase() ?? '-'}</dd></div>
+                {isMiniMaxH3VideoModel(detailTask.model) && isMiniMaxH3SuperResolutionSize(detailTask.size) && (
+                  <div><dt>aspect_ratio（实际请求）</dt><dd>{detailTask.aspect_ratio ?? detailTask.ratio ?? '旧任务未记录'}</dd></div>
+                )}
                 {isVideoV3Model(detailTask.model) && detailTask.seed !== undefined && <div><dt>随机种子</dt><dd>{detailTask.seed}</dd></div>}
                 {isVideoV3Model(detailTask.model) && detailTask.grid_strength !== undefined && <div><dt>素材融合强度</dt><dd>{detailTask.grid_strength}</dd></div>}
                 {isVideoV3Model(detailTask.model) && detailTask.bypass_face_check !== undefined && <div><dt>人脸校验透传</dt><dd>{detailTask.bypass_face_check ? '开启' : '关闭'}</dd></div>}
