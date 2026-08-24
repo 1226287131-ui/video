@@ -271,15 +271,17 @@ test('automatically selects H3 workflow_id from the submitted media', () => {
   assert.equal(referencePayload.workflow_id, 'multi-reference')
 })
 
-test('sends direct H3 2K/4K size values and requires them for cf workflows', () => {
+test('sends H3 2K/4K size values with the selected aspect ratio and requires them for cf workflows', () => {
   const standardWorkflowPayload = buildMiniMaxH3SubmitPayload({
     model: 'MiniMax-H3',
     prompt: '4K 文生视频',
     seconds: 5,
     size: '4K',
+    aspect_ratio: '9:16',
   })
   assert.equal(standardWorkflowPayload.workflow_id, 'text-to-video')
   assert.equal(standardWorkflowPayload.size, '4K')
+  assert.equal(standardWorkflowPayload.aspect_ratio, '9:16')
 
   const payload = buildMiniMaxH3SubmitPayload({
     model: 'MiniMax-H3',
@@ -287,10 +289,28 @@ test('sends direct H3 2K/4K size values and requires them for cf workflows', () 
     seconds: 5,
     workflow_id: 'cf-multi-reference',
     size: '4K',
+    aspectRatio: '16:9',
     images: ['https://example.com/a.jpg'],
   })
   assert.equal(payload.workflow_id, 'cf-multi-reference')
   assert.equal(payload.size, '4K')
+  assert.equal(payload.aspect_ratio, '16:9')
+
+  const fixedSizePayload = buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '固定分辨率文生视频',
+    seconds: 5,
+    size: '1920x1088',
+    aspect_ratio: '16:9',
+  })
+  assert.equal('aspect_ratio' in fixedSizePayload, false)
+
+  assert.throws(() => buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '缺少超分画幅',
+    seconds: 5,
+    size: '2K',
+  }), /必须传入有效的 aspect_ratio/)
 
   assert.throws(() => buildMiniMaxH3SubmitPayload({
     model: 'MiniMax-H3',

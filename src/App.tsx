@@ -2764,6 +2764,7 @@ function VideoStudioApp() {
             prompt: submittedPrompt,
             seconds: formSnapshot.duration,
             size: formSnapshot.size,
+            aspectRatio: formSnapshot.ratio,
             workflowId: formSnapshot.miniMaxWorkflow,
             images: referenceUrls,
             referenceVideos: referenceVideoUrls,
@@ -4018,7 +4019,7 @@ function VideoStudioApp() {
                           {miniMaxSizeOptions.filter(isMiniMaxH3SuperResolutionSize).map((size) => <option key={size} value={size}>{size}</option>)}
                         </optgroup>
                       </select>
-                      <span className="field-hint">每个画幅均提供固定分辨率及 2K/4K。提交时直接发送 size，其余高级参数由上游默认处理。</span>
+                      <span className="field-hint">每个画幅均提供固定分辨率及 2K/4K。选择 2K/4K 时会同时发送当前画幅的 aspect_ratio。</span>
                     </div>
                     <div className="options-group minimax-option-group">
                       <label className="options-group-label" htmlFor="minimax-workflow"><Settings2 size={14} /> workflow_id</label>

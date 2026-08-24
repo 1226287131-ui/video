@@ -1,6 +1,7 @@
 import { isVideoV2Model } from './v2Media.ts'
 import {
   isMiniMaxH3VideoModel,
+  isValidMiniMaxH3AspectRatio,
   isValidMiniMaxH3Multiple,
   isValidMiniMaxH3VideoSeconds,
   isValidMiniMaxH3VideoSize,
@@ -444,11 +445,15 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
   }
   const usesSuperResolution = workflowId.startsWith('cf-')
   const effectiveSize = workflowSize ?? size
+  const requiresAspectRatio = isMiniMaxH3SuperResolutionSize(effectiveSize)
   if (usesSuperResolution && !isMiniMaxH3SuperResolutionSize(effectiveSize)) {
     throw new Error('MiniMax-H3 的 cf 工作流必须选择 2K 或 4K size')
   }
   if (!usesSuperResolution && workflowSize) {
     throw new Error('MiniMax-H3 请使用 size 传入 2K 或 4K，不要发送 workflow_size')
+  }
+  if (requiresAspectRatio && !isValidMiniMaxH3AspectRatio(aspectRatio)) {
+    throw new Error('MiniMax-H3 选择 2K 或 4K size 时必须传入有效的 aspect_ratio')
   }
   if (workflowId === 'text-to-video' && (images.length || referenceVideos.length || referenceAudios.length || referenceVideoAudios.length)) {
     throw new Error('MiniMax-H3 的 text-to-video 工作流不能携带参考素材')
@@ -486,7 +491,7 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
   if (promptEnhance !== undefined) payload.prompt_enhance = promptEnhance
   if (resolution !== undefined) payload.resolution = resolution
   if (clarity !== undefined) payload.clarity = clarity
-  if (aspectRatio !== undefined) payload.aspect_ratio = aspectRatio
+  if (requiresAspectRatio) payload.aspect_ratio = aspectRatio
   if (normalizedMegapixels !== undefined) payload.megapixels = normalizedMegapixels
   if (images.length > 0) payload.images = images
   if (referenceVideos.length > 0) payload.reference_videos = referenceVideos
