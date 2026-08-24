@@ -6,13 +6,13 @@ export const MINIMAX_H3_VIDEO_MODELS = [
 ] as const
 
 export const MINIMAX_H3_ASPECT_RATIOS = [
+  '16:9',
+  '9:16',
   '1:1',
   '2:3',
   '3:2',
   '3:4',
   '4:3',
-  '9:16',
-  '16:9',
   '21:9',
 ] as const
 
@@ -20,7 +20,7 @@ export type MiniMaxH3AspectRatio = typeof MINIMAX_H3_ASPECT_RATIOS[number]
 export type MiniMaxH3VideoSize = `${number}x${number}`
 
 /**
- * Documented `size` presets after the upstream's default 32-pixel alignment.
+ * Fixed `size` presets exposed by the H3 editor.
  *
  * The UI selects one final `size` value only. It must not also send clarity,
  * resolution, aspect_ratio, megapixels, or metadata.multiple.
@@ -29,48 +29,24 @@ export const MINIMAX_H3_STANDARD_SIZES_BY_RATIO: Record<
   MiniMaxH3AspectRatio,
   readonly MiniMaxH3VideoSize[]
 > = {
-  '1:1': [
-    '448x448', '576x576', '640x640', '736x736', '800x800', '864x864', '928x928',
-    '960x960', '1024x1024', '1024x1024', '1120x1120', '1248x1248', '1376x1376', '1440x1440',
-  ],
-  '2:3': [
-    '384x576', '448x672', '544x800', '576x896', '640x960', '704x1056', '736x1120',
-    '800x1184', '832x1248', '832x1248', '928x1376', '1024x1536', '1120x1696', '1184x1760',
-  ],
-  '3:2': [
-    '576x384', '672x448', '800x544', '896x576', '960x640', '1056x704', '1120x736',
-    '1184x800', '1248x832', '1248x832', '1376x928', '1536x1024', '1696x1120', '1760x1184',
-  ],
-  '3:4': [
-    '384x544', '480x640', '576x736', '640x832', '672x928', '736x992', '800x1056',
-    '832x1120', '864x1184', '896x1184', '960x1280', '1088x1440', '1184x1600', '1248x1664',
-  ],
-  '4:3': [
-    '544x384', '640x480', '736x576', '832x640', '928x672', '992x736', '1056x800',
-    '1120x832', '1184x864', '1184x896', '1280x960', '1440x1088', '1600x1184', '1664x1248',
-  ],
-  '9:16': [
-    '352x608', '416x736', '480x864', '544x960', '608x1056', '640x1152', '672x1216',
-    '736x1280', '768x1344', '768x1376', '832x1504', '928x1664', '1024x1824', '1088x1920',
-  ],
-  '16:9': [
-    '608x352', '736x416', '864x480', '960x544', '1056x608', '1152x640', '1216x672',
-    '1280x736', '1344x768', '1376x768', '1504x832', '1664x928', '1824x1024', '1920x1088',
-  ],
-  '21:9': [
-    '704x288', '864x352', '992x416', '1120x480', '1216x512', '1312x576', '1408x608',
-    '1472x640', '1536x672', '1568x672', '1728x736', '1920x832', '2112x896', '2208x960',
-  ],
+  '16:9': ['864x480', '1376x768', '1920x1088'],
+  '9:16': ['480x864', '768x1376', '1088x1920'],
+  '1:1': ['640x640', '1024x1024', '1440x1440'],
+  '2:3': ['544x800', '832x1248', '1184x1760'],
+  '3:2': ['800x544', '1248x832', '1760x1184'],
+  '3:4': ['576x736', '896x1184', '1248x1664'],
+  '4:3': ['736x576', '1184x896', '1664x1248'],
+  '21:9': ['992x416', '1568x672', '2208x960'],
 }
 
 export const MINIMAX_H3_VIDEO_SIZES = [
+  ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['16:9'],
+  ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['9:16'],
   ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['1:1'],
   ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['2:3'],
   ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['3:2'],
   ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['3:4'],
   ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['4:3'],
-  ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['9:16'],
-  ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['16:9'],
   ...MINIMAX_H3_STANDARD_SIZES_BY_RATIO['21:9'],
 ] as const
 

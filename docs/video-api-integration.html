@@ -632,7 +632,7 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
               <tr><td>413</td><td>单文件或请求体超过网关限制</td><td>压缩媒体，或改用可公开访问的 CDN URL。</td></tr>
               <tr><td>429 / 5xx</td><td>限流、上游繁忙、网关暂时异常</td><td>降低并发；已有 task_id 时先查询，不要立即重复创建。</td></tr>
             </tbody></table>
-            <div style="margin-top:14px"><details><summary>常见字段混用</summary><div class="details-body"><p><code>grok-imagine-1.5-video</code> 只接受 multipart 的 <code>input_reference</code> 文件；不要发送 JSON 的 <code>images</code>。</p><p><code>video-v3</code> 原协议不能发送 <code>size</code>、<code>start_frame_url</code> 或 <code>end_frame_url</code>；这些字段仅属于 QY 兼容协议。QY 的首帧或尾帧 URL 不能与 <code>images</code> 同时发送。</p><p><code>MiniMax-H3</code> 当前网页必带 <code>workflow_id</code>；默认无素材为 <code>text-to-video</code>、有参考素材为 <code>multi-reference</code>，<code>cf-*</code> 超分工作流需额外选择 <code>size: "2K"</code> 或 <code>"4K"</code>。网页使用 <code>seconds / size</code> 和 <code>images / reference_videos / reference_audios</code>；不发送 <code>reference_video_audios</code>、<code>mode</code>、<code>clarity</code>、<code>resolution</code>、<code>aspect_ratio</code>、<code>megapixels</code> 或 <code>metadata.multiple</code>。</p></div></details><details><summary>安全与保存</summary><div class="details-body"><p>API Key 不要写入公开前端源码、仓库或查询参数。参考 URL 必须无需登录即可被上游访问。视频结果最长保留 48 小时，完成后请及时下载或转存。</p></div></details></div>
+            <div style="margin-top:14px"><details><summary>常见字段混用</summary><div class="details-body"><p><code>grok-imagine-1.5-video</code> 只接受 multipart 的 <code>input_reference</code> 文件；不要发送 JSON 的 <code>images</code>。</p><p><code>video-v3</code> 原协议不能发送 <code>size</code>、<code>start_frame_url</code> 或 <code>end_frame_url</code>；这些字段仅属于 QY 兼容协议。QY 的首帧或尾帧 URL 不能与 <code>images</code> 同时发送。</p><p><code>MiniMax-H3</code> 当前网页必带 <code>workflow_id</code>；无素材时自动选择 <code>text-to-video</code>，存在素材时自动选择 <code>multi-reference</code>。但 <code>multi-reference</code> 至少需要一张图片，因此仅有视频或音频时应补充图片，或按上游限制手动选择工作流。<code>cf-*</code> 超分工作流必须将 <code>size</code> 设为 <code>"2K"</code> 或 <code>"4K"</code>。网页使用 <code>seconds / size</code> 和 <code>images / reference_videos / reference_audios</code>；不发送 <code>reference_video_audios</code>、<code>mode</code>、<code>clarity</code>、<code>resolution</code>、<code>aspect_ratio</code>、<code>megapixels</code> 或 <code>metadata.multiple</code>。</p></div></details><details><summary>安全与保存</summary><div class="details-body"><p>API Key 不要写入公开前端源码、仓库或查询参数。参考 URL 必须无需登录即可被上游访问。视频结果最长保留 48 小时，完成后请及时下载或转存。</p></div></details></div>
           </section>
 
           <section id="codex-setup" class="section">
@@ -829,10 +829,10 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
         },
         {
           id: 'model-minimax', name: 'MiniMax-H3', family: 'openai-video', tone: 'coral', format: 'JSON', method: 'POST', endpoint: '/v1/videos', query: 'GET /v1/videos/{task_id}',
-          summary: '本站 H3 请求新增必填 workflow_id；页面默认按素材自动选择，也支持手动指定首尾帧、超分和漫剧工作流。', aliases: 'MiniMax-H3',
-          metrics: [['时长', '4-15s'], ['画幅', '8 种'], ['输出尺寸', '0.2-2.0 MP 预设'], ['参考素材', '9 图 / 3 视频 / 3 音频']],
-          fields: [['model', 'string', '是', '使用上述任一已适配模型名；对外显示名称统一为 MiniMax-H3。'], ['prompt', 'string', '是', '非空视频描述；使用 @参考图N、@参考视频N、@参考音频N 时，页面会编译为数组顺序说明。'], ['workflow_id', 'enum<string>', '是', '可选 text-to-video、multi-reference、fl2v、cf-multi-reference、cf-fl2v、mj、cf-mj。选择“自动”时无素材使用 text-to-video，有任一参考素材使用 multi-reference；首尾帧模式使用 fl2v。cf-* 和 mj 无法仅凭素材可靠推断，需手动传入。'], ['seconds', 'integer', '是', '4-15 的整数；页面默认 5。'], ['size', 'string', '是', '普通工作流使用宽x高；cf-* 超分工作流只能使用 2K 或 4K。普通页面按画幅筛选预设尺寸，默认 1920x1088；具体映射见下方速查表。'], ['images', 'string[]', '否', '公网图片 URL，最多 9 张。multi-reference 至少 1 张；fl2v/cf-fl2v 需要 1-2 张。'], ['reference_videos', 'string[]', '否', '公网视频 URL，最多 3 段；不能用于 text-to-video，且 fl2v/cf-fl2v 不允许同时使用。'], ['reference_audios', 'string[]', '否', '独立公网音频 URL，最多 3 段；不能用于 text-to-video，且 fl2v/cf-fl2v 不允许同时使用。']],
-          rules: ['workflow_id 是必填字段，不能省略；网页的“自动选择”只根据当前素材推断 text-to-video、multi-reference 或 fl2v，cf-* 超分和 mj 漫剧必须手动选择。', 'text-to-video 不能携带任何参考素材；multi-reference 至少需要 1 张图片；fl2v/cf-fl2v 需要 1-2 张图片且不能同时使用视频或音频。', 'cf-multi-reference、cf-fl2v、cf-mj 必须把 size 设置为 2K 或 4K；普通工作流不能使用 2K/4K。', '网页仅在对应素材非空时发送数组字段；同类重复 URL 或文件名会在提交前去重。', '不要混发 aspect_ratio、resolution、clarity、megapixels、metadata.multiple、mode、reference_video_audios、audio 或 prompt_enhance；当前网页不会发送这些字段。', '图片、视频与音频外链可来自项目临时上传服务，且必须能被上游公网访问。'],
+          summary: 'MiniMax-H3 通过必填 workflow_id 明确生成工作流；网页默认自动选择基础工作流，也可手动指定首尾帧、超分或漫剧工作流。', aliases: 'MiniMax-H3',
+          metrics: [['时长', '4-15s'], ['画幅', '8 种'], ['输出尺寸', '480P / 768P / 1080P'], ['参考素材', '9 图 / 3 视频 / 3 音频']],
+          fields: [['model', 'string', '是', '对外模型名称为 MiniMax-H3。'], ['prompt', 'string', '是', '非空视频描述；使用 @参考图N、@参考视频N、@参考音频N 时，页面会编译为数组顺序说明。'], ['workflow_id', 'enum<string>', '是', '请求必须传入。可选 text-to-video、multi-reference、fl2v、cf-multi-reference、cf-fl2v、mj、cf-mj；网页的“自动”最终也会发送解析后的实际值。'], ['seconds', 'integer', '是', '4-15 的整数；页面默认 5。'], ['size', 'string', '是', '普通工作流只能使用下方表中的固定宽x高尺寸，默认 1920x1088；cf-* 超分工作流改为只能传 2K 或 4K。不要额外发送 workflow_size。'], ['images', 'string[]', '否', '公网图片 URL，最多 9 张。multi-reference/cf-multi-reference 至少 1 张；fl2v/cf-fl2v 需要 1-2 张。'], ['reference_videos', 'string[]', '否', '公网视频 URL，最多 3 段；text-to-video、fl2v/cf-fl2v 不可同时发送。'], ['reference_audios', 'string[]', '否', '独立公网音频 URL，最多 3 段；text-to-video、fl2v/cf-fl2v 不可同时发送。']],
+          rules: ['工作流选择：text-to-video 为纯文生；multi-reference 为至少 1 张图片的参考素材生成；fl2v 为 1-2 张图片的首尾帧生成；cf-multi-reference、cf-fl2v、cf-mj 为对应的超分工作流；mj/cf-mj 为漫剧工作流。', '网页自动规则：没有任何素材时发送 text-to-video；存在参考素材时发送 multi-reference。由于 multi-reference 至少需要 1 张图片，只有视频或音频时不能直接使用自动选择，应补充图片或按上游要求手动选择工作流。', 'fl2v/cf-fl2v 必须手动选择：只允许 1-2 张图片，不能同时发送参考视频或参考音频；两张图片时按数组顺序作为首帧、尾帧。', 'cf-multi-reference、cf-fl2v、cf-mj 必须把请求内的 size 设置为 2K 或 4K；非 cf 工作流不能使用 2K/4K。', '网页仅在对应素材非空时发送数组字段；同类重复 URL 或文件名会在提交前去重。', '不要混发 aspect_ratio、resolution、clarity、megapixels、metadata.multiple、mode、reference_video_audios、audio 或 prompt_enhance；当前网页不会发送这些字段。', '图片、视频与音频外链可来自项目临时上传服务，且必须能被上游公网访问。'],
           resolutionGuide: renderMiniMaxH3ResolutionGuide(),
           example: `{
   "model": "MiniMax-H3",
@@ -922,35 +922,19 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
           </section>
         `;
 
-        const lowMid = renderTable(
-          '低至中等清晰度档位',
-          '0.2 - 0.9 MP',
-          ['0.2 MP', '0.3 MP', '0.4 MP', '0.5 MP', '0.6 MP', '0.7 MP', '0.8 MP', '0.9 MP'],
+        const fixedSizes = renderTable(
+          '固定尺寸',
+          '普通工作流',
+          ['480P', '768P', '1080P'],
           [
-            ['1:1', ['448x448', '576x576', '640x640', '736x736', '800x800', '864x864', '928x928', '960x960']],
-            ['2:3', ['384x576', '448x672', '544x800', '576x896', '640x960', '704x1056', '736x1120', '800x1184']],
-            ['3:2', ['576x384', '672x448', '800x544', '896x576', '960x640', '1056x704', '1120x736', '1184x800']],
-            ['3:4', ['384x544', '480x640', '576x736', '640x832', '672x928', '736x992', '800x1056', '832x1120']],
-            ['4:3', ['544x384', '640x480', '736x576', '832x640', '928x672', '992x736', '1056x800', '1120x832']],
-            ['9:16', ['352x608', '416x736', '480x864', '544x960', '608x1056', '640x1152', '672x1216', '736x1280']],
-            ['16:9', ['608x352', '736x416', '864x480', '960x544', '1056x608', '1152x640', '1216x672', '1280x736']],
-            ['21:9', ['704x288', '864x352', '992x416', '1120x480', '1216x512', '1312x576', '1408x608', '1472x640']],
-          ],
-        );
-
-        const high = renderTable(
-          '高等清晰度档位',
-          '0.98 - 2.0 MP',
-          ['0.98 MP', '1.0 MP', '1.2 MP', '1.5 MP', '1.8 MP', '2.0 MP'],
-          [
-            ['1:1', ['1024x1024', '1024x1024', '1120x1120', '1248x1248', '1376x1376', '1440x1440']],
-            ['2:3', ['832x1248', '832x1248', '928x1376', '1024x1536', '1120x1696', '1184x1760']],
-            ['3:2', ['1248x832', '1248x832', '1376x928', '1536x1024', '1696x1120', '1760x1184']],
-            ['3:4', ['864x1184', '896x1184', '960x1280', '1088x1440', '1184x1600', '1248x1664']],
-            ['4:3', ['1184x864', '1184x896', '1280x960', '1440x1088', '1600x1184', '1664x1248']],
-            ['9:16', ['768x1344', '768x1376', '832x1504', '928x1664', '1024x1824', '1088x1920']],
-            ['16:9', ['1344x768', '1376x768', '1504x832', '1664x928', '1824x1024', '1920x1088']],
-            ['21:9', ['1536x672', '1568x672', '1728x736', '1920x832', '2112x896', '2208x960']],
+            ['16:9', ['864x480', '1376x768', '1920x1088']],
+            ['9:16', ['480x864', '768x1376', '1088x1920']],
+            ['1:1', ['640x640', '1024x1024', '1440x1440']],
+            ['2:3', ['544x800', '832x1248', '1184x1760']],
+            ['3:2', ['800x544', '1248x832', '1760x1184']],
+            ['3:4', ['576x736', '896x1184', '1248x1664']],
+            ['4:3', ['736x576', '1184x896', '1664x1248']],
+            ['21:9', ['992x416', '1568x672', '2208x960']],
           ],
         );
 
@@ -958,9 +942,8 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
           <details class="resolution-guide">
             <summary>查看 H3 尺寸速查</summary>
             <div class="resolution-guide-body">
-              <p class="resolution-guide-note">size 只发送宽x高；页面会按画幅筛选预设值。下面整理的是当前 H3 页面支持的全部分辨率，默认值为 <code>1920x1088</code>。</p>
-              ${lowMid}
-              ${high}
+              <p class="resolution-guide-note">普通工作流的 <code>size</code> 只允许使用下表固定宽x高值，默认值为 <code>1920x1088</code>。<code>cf-*</code> 超分工作流例外，<code>size</code> 只能为 <code>2K</code> 或 <code>4K</code>。</p>
+              ${fixedSizes}
             </div>
           </details>
         `;

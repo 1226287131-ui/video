@@ -2143,6 +2143,21 @@ pre {
     flex: 1;
     justify-content: center;
   }
+  .minimax-option-group {
+    align-items: stretch;
+    flex-basis: 100%;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .minimax-option-group .options-group-label,
+  .minimax-option-group .field-hint {
+    margin: 0;
+  }
+  .minimax-option-group .minimax-select {
+    flex: 0 0 auto;
+    width: 100%;
+  }
   .reference-image-panel {
     grid-template-columns: 1fr;
   }

@@ -26,6 +26,17 @@ const form = {
   quality: 'hd',
 }
 
+const fixedMiniMaxH3SizesByRatio = {
+  '16:9': ['864x480', '1376x768', '1920x1088'],
+  '9:16': ['480x864', '768x1376', '1088x1920'],
+  '1:1': ['640x640', '1024x1024', '1440x1440'],
+  '2:3': ['544x800', '832x1248', '1184x1760'],
+  '3:2': ['800x544', '1248x832', '1760x1184'],
+  '3:4': ['576x736', '896x1184', '1248x1664'],
+  '4:3': ['736x576', '1184x896', '1664x1248'],
+  '21:9': ['992x416', '1568x672', '2208x960'],
+}
+
 test('compiles MiniMax-H3 media mentions into explicit array-order instructions', () => {
   const result = normalizeMiniMaxH3Mentions(
     '让 @参考图2 的人物沿着 @参考视频1 的动作前进，并保留 @参考音频1 的节奏。',
@@ -112,8 +123,9 @@ test('recognizes and validates the MiniMax-H3 contract', () => {
   for (const size of MINIMAX_H3_VIDEO_SIZES) assert.equal(isValidMiniMaxH3VideoSize(size), true)
   for (const ratio of MINIMAX_H3_ASPECT_RATIOS) {
     assert.equal(isValidMiniMaxH3AspectRatio(ratio), true)
-    assert.ok(getMiniMaxH3VideoSizesForAspectRatio(ratio).length >= 12)
+    assert.deepEqual(getMiniMaxH3VideoSizesForAspectRatio(ratio), fixedMiniMaxH3SizesByRatio[ratio])
   }
+  assert.equal(MINIMAX_H3_VIDEO_SIZES.length, 24)
   assert.equal(isValidMiniMaxH3AspectRatio('auto'), false)
   assert.equal(isValidMiniMaxH3VideoSize('1920x1088'), true)
   assert.equal(isValidMiniMaxH3VideoSize('1376x768'), true)

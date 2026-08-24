@@ -2124,10 +2124,22 @@ function VideoStudioApp() {
       ...current,
         prompt: item.prompt ?? current.prompt,
         duration: item.seconds ?? item.duration ?? current.duration,
-        ratio: item.ratio ?? current.ratio,
+        ratio: historyUsesMiniMax && !isValidMiniMaxH3AspectRatio(item.ratio)
+          ? MINIMAX_H3_DEFAULT_ASPECT_RATIO
+          : item.ratio ?? current.ratio,
         quality: item.quality ?? current.quality,
         resolution: item.resolution ?? current.resolution,
-        size: item.size ?? current.size,
+        size: historyUsesMiniMax
+          ? (() => {
+              const ratio = isValidMiniMaxH3AspectRatio(item.ratio)
+                ? item.ratio
+                : MINIMAX_H3_DEFAULT_ASPECT_RATIO
+              const sizes = getMiniMaxH3VideoSizesForAspectRatio(ratio)
+              return sizes.includes(item.size as MiniMaxH3VideoSize)
+                ? item.size as MiniMaxH3VideoSize
+                : sizes[sizes.length - 1] ?? MINIMAX_H3_DEFAULT_SIZE
+            })()
+          : item.size ?? current.size,
         miniMaxWorkflow: item.workflow_id ?? current.miniMaxWorkflow,
         miniMaxWorkflowSize: item.workflow_size ?? current.miniMaxWorkflowSize,
         videoV3Size: item.video_v3_size ?? current.videoV3Size,
@@ -3951,7 +3963,7 @@ function VideoStudioApp() {
                 
                 {miniMaxModelSelected ? (
                   <>
-                    <div className="options-group" style={{ marginTop: 8 }}>
+                    <div className="options-group minimax-option-group" style={{ marginTop: 8 }}>
                       <label className="options-group-label" htmlFor="minimax-aspect-ratio"><Layout size={14} /> 画幅</label>
                       <select
                         id="minimax-aspect-ratio"
@@ -3962,7 +3974,7 @@ function VideoStudioApp() {
                         {MINIMAX_H3_ASPECT_RATIOS.map((ratio) => <option key={ratio} value={ratio}>{ratio}</option>)}
                       </select>
                     </div>
-                    <div className="options-group" style={{ marginTop: 8 }}>
+                    <div className="options-group minimax-option-group" style={{ marginTop: 8 }}>
                       <label className="options-group-label" htmlFor="minimax-size"><Settings2 size={14} /> 输出分辨率</label>
                       <select
                         id="minimax-size"
@@ -3970,12 +3982,11 @@ function VideoStudioApp() {
                         value={form.size}
                         onChange={(event) => updateField('size', event.target.value as VideoSize)}
                       >
-                        {!miniMaxSizeOptions.includes(form.size) && <option value={form.size}>{form.size}（历史尺寸）</option>}
                         {[...new Set(miniMaxSizeOptions)].map((size) => <option key={size} value={size}>{size}</option>)}
                       </select>
                       <span className="field-hint">已按当前画幅列出全部可选尺寸。提交时仅发送该尺寸，其余高级参数由上游默认处理。</span>
                     </div>
-                    <div className="options-group" style={{ marginTop: 8 }}>
+                    <div className="options-group minimax-option-group" style={{ marginTop: 8 }}>
                       <label className="options-group-label" htmlFor="minimax-workflow"><Settings2 size={14} /> workflow_id</label>
                       <select
                         id="minimax-workflow"
@@ -3990,7 +4001,7 @@ function VideoStudioApp() {
                         自动规则：无素材使用 text-to-video；有参考图/视频/音频使用 multi-reference。cf-* 超分和 mj 漫剧模式需要手动选择。
                       </span>
                     </div>
-                    {form.miniMaxWorkflow.startsWith('cf-') && <div className="options-group" style={{ marginTop: 8 }}>
+                    {form.miniMaxWorkflow.startsWith('cf-') && <div className="options-group minimax-option-group" style={{ marginTop: 8 }}>
                       <label className="options-group-label" htmlFor="minimax-workflow-size"><Settings2 size={14} /> 超分尺寸</label>
                       <select
                         id="minimax-workflow-size"
