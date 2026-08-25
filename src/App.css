@@ -3565,6 +3565,12 @@ pre {
   color: var(--console-secondary);
 }
 
+.floating-console .minimax-workflow-hint {
+  display: block;
+  grid-column: 1 / -1;
+  margin-top: -4px;
+}
+
 .floating-console .reference-image-panel,
 .floating-console .video-v2-media-panel {
   gap: 12px;
@@ -3614,9 +3620,28 @@ pre {
 .floating-console .video-v2-media-dropzone:focus-within,
 .floating-console .video-v2-media-dropzone.is-dragging {
   color: var(--console-text);
-  border-color: rgba(0, 113, 227, 0.55);
-  background: #f0f7ff;
-  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.12);
+  border-color: var(--console-blue);
+  background: var(--console-surface);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1);
+}
+
+/* Reference video uses the same neutral surface as image/audio uploads. */
+.floating-console .video-v2-media-section.media-video .video-v2-media-dropzone,
+.floating-console .video-v2-media-section.media-video-audio .video-v2-media-dropzone {
+  border-color: var(--console-border);
+  color: var(--console-secondary);
+  background: var(--console-surface);
+}
+
+.floating-console .video-v2-media-section.media-video .video-v2-media-dropzone:hover,
+.floating-console .video-v2-media-section.media-video .video-v2-media-dropzone:focus-within,
+.floating-console .video-v2-media-section.media-video .video-v2-media-dropzone.is-dragging,
+.floating-console .video-v2-media-section.media-video-audio .video-v2-media-dropzone:hover,
+.floating-console .video-v2-media-section.media-video-audio .video-v2-media-dropzone:focus-within,
+.floating-console .video-v2-media-section.media-video-audio .video-v2-media-dropzone.is-dragging {
+  border-color: var(--console-blue);
+  color: var(--console-text);
+  background: var(--console-surface);
 }
 
 .floating-console .image-dropzone-icon,

@@ -8,26 +8,26 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #f8fafc;
-        --bg-soft: #f1f5f9;
+        --bg: #f5f5f7;
+        --bg-soft: #f2f2f7;
         --surface: #ffffff;
-        --surface-2: #f8fafc;
+        --surface-2: #f8f8fa;
         --surface-3: #eef4ff;
-        --line: #e2e8f0;
-        --line-soft: #edf2f7;
-        --text: #0f172a;
-        --muted: #475569;
-        --subtle: #64748b;
-        --cyan: #2563eb;
-        --blue: #2563eb;
-        --lime: #15803d;
-        --amber: #a16207;
-        --coral: #c2410c;
-        --danger: #b91c1c;
-        --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 1px 3px rgba(15, 23, 42, .06);
-        --radius: 7px;
+        --line: #d9d9de;
+        --line-soft: #e9e9ed;
+        --text: #1d1d1f;
+        --muted: #6e6e73;
+        --subtle: #86868b;
+        --cyan: #0071e3;
+        --blue: #0071e3;
+        --lime: #248a3d;
+        --amber: #9a6700;
+        --coral: #c93400;
+        --danger: #c93400;
+        --shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 8px 24px rgba(0, 0, 0, .035);
+        --radius: 12px;
         --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-        --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+        --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Microsoft YaHei", sans-serif;
       }
 
       * { box-sizing: border-box; }
@@ -39,9 +39,9 @@
         color: var(--text);
         font-family: var(--sans);
         font-size: 15px;
-        line-height: 1.65;
+        line-height: 1.6;
       }
-      body::before { content: ""; display: block; height: 3px; background: var(--cyan); }
+      body::before { content: ""; display: block; height: 2px; background: var(--cyan); }
       a { color: inherit; }
       button, input { font: inherit; }
       button { cursor: pointer; }
@@ -68,11 +68,11 @@
         align-items: center;
         justify-content: space-between;
         gap: 20px;
-        min-height: 58px;
-        padding: 9px clamp(18px, 4vw, 56px);
-        border-bottom: 1px solid var(--line);
-        background: rgba(255, 255, 255, .96);
-        backdrop-filter: blur(12px);
+        min-height: 64px;
+        padding: 10px clamp(18px, 4vw, 56px);
+        border-bottom: 1px solid rgba(0, 0, 0, .08);
+        background: rgba(255, 255, 255, .86);
+        backdrop-filter: saturate(180%) blur(20px);
       }
       .brand { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; }
       .brand-mark {
@@ -81,52 +81,53 @@
         height: 34px;
         place-items: center;
         border: 0;
-        border-radius: 8px;
+        border-radius: 9px;
         background: var(--cyan);
         color: #fff;
         font-family: var(--mono);
-        font-size: 13px;
-        font-weight: 800;
+        font-size: 12px;
+        font-weight: 700;
         letter-spacing: .04em;
       }
       .brand-text { display: grid; line-height: 1.15; }
-      .brand-text strong { font-size: 14px; letter-spacing: 0; }
+      .brand-text strong { font-size: 15px; letter-spacing: -.01em; }
       .brand-text span { color: var(--subtle); font-size: 11px; }
       .top-actions { display: flex; align-items: center; gap: 8px; }
       .top-actions button, .top-actions a, .hero-actions button {
-        min-height: 40px;
-        padding: 7px 12px;
-        border: 1px solid var(--line);
-        border-radius: 6px;
+        min-height: 38px;
+        padding: 7px 13px;
+        border: 1px solid #d2d2d7;
+        border-radius: 9px;
         background: var(--surface);
         color: var(--text);
         font-size: 13px;
-        font-weight: 650;
+        font-weight: 600;
         text-decoration: none;
-        transition: border-color .2s ease, background .2s ease, transform .2s ease;
+        transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
       }
       .top-actions button:hover, .top-actions a:hover, .hero-actions button:hover {
-        border-color: #93c5fd;
-        background: #f8fbff;
+        border-color: #a7a7ad;
+        background: #fafafa;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
       }
 
-      .shell { width: min(1520px, 100%); margin: 0 auto; padding: 0 clamp(18px, 4vw, 56px) 72px; }
+      .shell { width: min(1480px, 100%); margin: 0 auto; padding: 0 clamp(18px, 4vw, 56px) 80px; }
       .hero {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: end;
         gap: 28px;
-        padding: 38px 0 30px;
+        padding: 58px 0 42px;
         border-bottom: 1px solid var(--line);
       }
       .eyebrow {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
         color: var(--cyan);
         font-family: var(--mono);
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 700;
         letter-spacing: .08em;
         text-transform: uppercase;
@@ -136,11 +137,11 @@
       h1 {
         max-width: 760px;
         margin-bottom: 10px;
-        font-size: clamp(30px, 4vw, 42px);
-        line-height: 1.18;
-        letter-spacing: 0;
+        font-size: clamp(34px, 4vw, 52px);
+        line-height: 1.08;
+        letter-spacing: -.035em;
       }
-      .hero-copy { max-width: 720px; margin-bottom: 0; color: var(--muted); font-size: 15px; }
+      .hero-copy { max-width: 680px; margin-bottom: 0; color: var(--muted); font-size: 16px; }
       .hero-copy code { color: var(--cyan); }
       .hero-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
       .hero-actions .primary { border-color: var(--cyan); background: var(--cyan); color: #fff; }
@@ -150,50 +151,51 @@
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 0;
-        margin: 20px 0 36px;
+        margin: 24px 0 44px;
         border: 1px solid var(--line);
-        border-radius: 8px;
+        border-radius: 14px;
         overflow: hidden;
         background: var(--surface);
       }
-      .overview-stat { min-height: 76px; padding: 14px 18px; background: var(--surface); }
+      .overview-stat { min-height: 84px; padding: 17px 20px; background: var(--surface); }
       .overview-stat + .overview-stat { border-left: 1px solid var(--line); }
-      .overview-stat strong { display: block; margin-bottom: 2px; color: var(--text); font-family: var(--mono); font-size: 20px; line-height: 1.2; }
+      .overview-stat strong { display: block; margin-bottom: 3px; color: var(--text); font-family: var(--mono); font-size: 22px; line-height: 1.2; }
       .overview-stat span { color: var(--subtle); font-size: 12px; }
 
-      .layout { display: grid; grid-template-columns: 244px minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
-      .sidebar { position: sticky; top: 78px; max-height: calc(100dvh - 96px); overflow: auto; padding: 2px 18px 8px 0; border-right: 1px solid var(--line); }
+      .layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
+      .sidebar { position: sticky; top: 82px; max-height: calc(100dvh - 102px); overflow: auto; padding: 2px 20px 8px 0; border-right: 1px solid var(--line); }
       .sidebar-label { margin: 0 0 10px; color: var(--subtle); font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
       .toc { display: grid; gap: 3px; }
       .toc a {
         display: block;
-        padding: 7px 10px;
+        padding: 8px 11px;
         border-left: 2px solid transparent;
-        border-radius: 0 5px 5px 0;
+        border-radius: 8px;
         color: var(--muted);
         font-size: 13px;
         text-decoration: none;
         transition: color .2s ease, border-color .2s ease, background .2s ease;
       }
-      .toc a:hover, .toc a.is-active { border-color: var(--cyan); background: #eff6ff; color: #1d4ed8; }
+      .toc a:hover, .toc a.is-active { border-color: var(--cyan); background: #eaf3ff; color: #0066cc; }
       .toc .toc-sub { padding-left: 22px; font-size: 12px; }
-      .sidebar-note { margin-top: 20px; padding: 12px; border: 1px solid #bfdbfe; border-radius: 7px; background: #eff6ff; color: #475569; font-size: 12px; }
+      .sidebar-note { margin-top: 20px; padding: 13px; border: 1px solid #cfe2fb; border-radius: 10px; background: #f0f6ff; color: var(--muted); font-size: 12px; }
       .sidebar-note code { color: var(--cyan); }
 
       .doc-content { min-width: 0; }
-      .section { scroll-margin-top: 82px; margin-bottom: 54px; }
+      .section { scroll-margin-top: 90px; margin-bottom: 64px; }
       .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
-      .section-heading h2 { margin-bottom: 0; font-size: clamp(22px, 3vw, 30px); letter-spacing: 0; line-height: 1.2; }
+      .section-heading h2 { margin-bottom: 0; font-size: clamp(24px, 3vw, 32px); letter-spacing: -.025em; line-height: 1.15; }
       .section-heading p { max-width: 620px; margin: 0; color: var(--muted); font-size: 14px; }
       .section-kicker { margin-bottom: 7px; color: var(--cyan); font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 
-      .callout { display: flex; gap: 13px; margin: 0 0 22px; padding: 14px 16px; border: 1px solid #bfdbfe; border-left: 3px solid var(--cyan); border-radius: 7px; background: #eff6ff; }
+      .callout { display: flex; gap: 13px; margin: 0 0 24px; padding: 16px 18px; border: 1px solid #cfe2fb; border-left: 3px solid var(--cyan); border-radius: 12px; background: #f0f6ff; }
       .callout strong { display: block; margin-bottom: 2px; color: #1d4ed8; }
       .callout p { margin: 0; color: var(--muted); font-size: 13px; }
       .callout code { color: var(--text); }
 
-      .protocol-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-      .protocol-card { min-height: 138px; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: none; }
+      .protocol-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+      .protocol-card { min-height: 148px; padding: 19px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); transition: transform .2s ease, box-shadow .2s ease; }
+      .protocol-card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0, 0, 0, .07); }
       .protocol-card .protocol-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; color: var(--subtle); font-family: var(--mono); font-size: 11px; text-transform: uppercase; }
       .protocol-card h3 { margin-bottom: 6px; font-size: 16px; }
       .protocol-card p { margin: 0; color: var(--muted); font-size: 13px; }
@@ -203,32 +205,32 @@
       .dot.amber { background: var(--amber); }
 
       .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; counter-reset: flow; }
-      .flow-step { position: relative; min-height: 118px; padding: 16px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); counter-increment: flow; }
+      .flow-step { position: relative; min-height: 124px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); counter-increment: flow; }
       .flow-step::before { content: counter(flow, decimal-leading-zero); display: block; margin-bottom: 12px; color: var(--cyan); font-family: var(--mono); font-size: 12px; font-weight: 700; }
       .flow-step:not(:last-child)::after { content: ""; position: absolute; top: 28px; right: -11px; z-index: 1; width: 20px; height: 1px; background: #cbd5e1; }
       .flow-step strong { display: block; margin-bottom: 3px; font-size: 14px; }
       .flow-step span { color: var(--muted); font-size: 12px; }
 
-      .model-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+      .model-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
       .search-wrap { position: relative; flex: 1; max-width: 440px; }
-      .search-wrap input { width: 100%; min-height: 42px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 6px; outline: none; background: var(--surface-2); color: var(--text); }
+      .search-wrap input { width: 100%; min-height: 42px; padding: 9px 13px; border: 1px solid var(--line); border-radius: 9px; outline: none; background: var(--surface-2); color: var(--text); }
       .search-wrap input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
       .filter-group { display: flex; flex-wrap: wrap; gap: 6px; }
-      .filter-btn { min-height: 38px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 650; }
-      .filter-btn:hover, .filter-btn.is-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+      .filter-btn { min-height: 38px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; transition: background .2s ease, border-color .2s ease; }
+      .filter-btn:hover, .filter-btn.is-active { border-color: #9dc8f4; background: #eaf3ff; color: #0066cc; }
       .model-grid { display: grid; gap: 16px; }
-      .model-card { overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: none; scroll-margin-top: 82px; }
+      .model-card { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); scroll-margin-top: 90px; }
       .model-card.is-hidden { display: none; }
-      .model-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; padding: 20px 20px 16px; border-bottom: 1px solid var(--line); }
+      .model-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 22px; padding: 23px 23px 18px; border-bottom: 1px solid var(--line); }
       .model-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-      .model-title-row h3 { margin: 0; font-size: 20px; letter-spacing: 0; }
+      .model-title-row h3 { margin: 0; font-size: 21px; letter-spacing: -.02em; }
       .tag { display: inline-flex; align-items: center; min-height: 23px; padding: 2px 7px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-2); color: var(--muted); font-family: var(--mono); font-size: 10px; font-weight: 700; }
       .tag.cyan { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
       .tag.blue { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
       .tag.amber { border-color: #fde68a; background: #fffbeb; color: #92400e; }
       .tag.coral { border-color: #fed7aa; background: #fff7ed; color: #9a3412; }
       .model-summary { max-width: 760px; margin: 0; color: var(--muted); font-size: 13px; }
-      .endpoint { min-width: 230px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 6px; background: #f8fafc; }
+      .endpoint { min-width: 230px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
       .endpoint small { display: block; margin-bottom: 4px; color: var(--subtle); font-family: var(--mono); font-size: 10px; }
       .endpoint code { display: block; overflow-wrap: anywhere; color: #1d4ed8; font-family: var(--mono); font-size: 12px; }
       .model-aliases { margin-top: 10px; color: var(--subtle); font-size: 12px; }
@@ -238,12 +240,12 @@
       .metric + .metric { border-left: 1px solid var(--line); }
       .metric span { display: block; margin-bottom: 2px; color: var(--subtle); font-size: 11px; }
       .metric strong { display: block; color: var(--text); font-family: var(--mono); font-size: 13px; line-height: 1.25; }
-      .model-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: 20px; padding: 20px; }
+      .model-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: 24px; padding: 23px; }
       .subheading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 10px; font-size: 14px; }
       .subheading span { color: var(--subtle); font-family: var(--mono); font-size: 10px; font-weight: 500; }
       .parameter-table { width: 100%; border-collapse: collapse; font-size: 12px; }
       .parameter-table th, .parameter-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-      .parameter-table th { color: var(--subtle); font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; background: #f8fafc; }
+      .parameter-table th { color: var(--subtle); font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; background: var(--surface-2); }
       .parameter-table td:first-child { width: 21%; color: var(--cyan); font-family: var(--mono); font-weight: 700; }
       .parameter-table td:nth-child(2) { width: 15%; color: var(--blue); font-family: var(--mono); font-size: 11px; }
       .parameter-table td:nth-child(3) { width: 11%; color: var(--muted); }
@@ -264,18 +266,18 @@
       .resolution-table th { white-space: nowrap; }
       .resolution-table td:first-child { width: 70px; color: var(--cyan); font-family: var(--mono); font-weight: 700; white-space: nowrap; }
       .resolution-table td code { color: var(--blue); font-family: var(--mono); font-size: 10px; }
-      .code-panel { position: relative; min-width: 0; border: 1px solid var(--line); border-radius: 7px; background: #f8fafc; }
+      .code-panel { position: relative; min-width: 0; border: 1px solid var(--line); border-radius: 11px; background: #f7f7f9; }
       .code-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border-bottom: 1px solid var(--line); color: var(--subtle); font-family: var(--mono); font-size: 10px; }
-      .copy-btn { min-height: 31px; padding: 4px 9px; border: 1px solid #bfdbfe; border-radius: 5px; background: #fff; color: #1d4ed8; font-size: 11px; font-weight: 700; }
-      .copy-btn:hover { border-color: var(--cyan); background: #eff6ff; color: #1d4ed8; }
-      pre { overflow: auto; margin: 0; padding: 15px; color: #1e293b; font-family: var(--mono); font-size: 11px; line-height: 1.65; tab-size: 2; white-space: pre; }
+      .copy-btn { min-height: 32px; padding: 5px 10px; border: 1px solid #b8d5f5; border-radius: 8px; background: #fff; color: #0066cc; font-size: 11px; font-weight: 700; transition: background .2s ease, border-color .2s ease; }
+      .copy-btn:hover { border-color: var(--cyan); background: #eaf3ff; color: #0066cc; }
+      pre { overflow: auto; margin: 0; padding: 16px; color: #242426; font-family: var(--mono); font-size: 11px; line-height: 1.65; tab-size: 2; white-space: pre; }
       .code-note { padding: 10px 13px 12px; border-top: 1px solid var(--line); color: var(--subtle); font-size: 11px; }
       .code-note code { color: #1d4ed8; }
       .empty-state { display: none; padding: 28px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); text-align: center; }
       .empty-state.is-visible { display: block; }
 
       .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-      .plain-panel { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: none; }
+      .plain-panel { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
       .plain-panel h3 { margin-bottom: 8px; font-size: 15px; }
       .plain-panel p { margin-bottom: 10px; color: var(--muted); font-size: 13px; }
       .plain-panel ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
@@ -285,7 +287,7 @@
       .mini-table th, .mini-table td { padding: 10px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
       .mini-table th { color: var(--subtle); font-family: var(--mono); font-size: 10px; text-transform: uppercase; background: #f8fafc; }
       .mini-table td:first-child { color: var(--cyan); font-family: var(--mono); font-weight: 700; }
-      details { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+      details { border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
       details + details { margin-top: 9px; }
       summary { min-height: 47px; padding: 12px 15px; cursor: pointer; color: var(--text); font-size: 13px; font-weight: 700; }
       summary::marker { color: var(--cyan); }
@@ -508,8 +510,7 @@
             <a class="toc-sub" href="#model-video-v2-fast">video-v2-fast</a>
             <a class="toc-sub" href="#model-grok">Grok Imagine</a>
             <a class="toc-sub" href="#model-minimax">MiniMax-H3</a>
-            <a class="toc-sub" href="#model-v3">video-v3 原协议</a>
-            <a class="toc-sub" href="#model-v3-qy">video-v3 QY 兼容</a>
+            <a class="toc-sub" href="#model-v3">video-v3</a>
             <a href="#media">素材上传</a>
             <a href="#responses">响应与轮询</a>
             <a href="#errors">错误处理</a>
@@ -579,7 +580,7 @@
               </article>
               <article class="plain-panel">
                 <h3>按模型区分提交方式</h3>
-                <ul><li><code>video-v1</code>：<code>images[]</code> URL，最多 9 张。</li><li><code>video-v2</code>、<code>video-v2-fast</code>：<code>images[] / videos[] / audios[]</code>，最多 9 图、3 视频、3 音频。</li><li><code>video-v3</code>：最多 30 图、10 视频、10 音频；字段形态取决于所选协议。</li><li><code>MiniMax-H3</code>：<code>images[] / reference_videos[] / reference_audios[]</code>，最多 9 图、3 视频、3 音频。</li><li><code>grok-imagine-1.5-video</code>：必须重新读取真实图片 Blob，并重复附加 <code>input_reference</code> 文件字段。</li></ul>
+                <ul><li><code>video-v1</code>：<code>images[]</code> URL，最多 9 张。</li><li><code>video-v2</code>、<code>video-v2-fast</code>：<code>images[] / videos[] / audios[]</code>，最多 9 图、3 视频、3 音频。</li><li><code>video-v3</code>：统一使用顶层 <code>prompt / images / videos / audios</code>，最多 30 图、10 视频、10 音频。</li><li><code>MiniMax-H3</code>：<code>images[] / reference_videos[] / reference_audios[]</code>，最多 9 图、3 视频、3 音频。</li><li><code>grok-imagine-1.5-video</code>：必须重新读取真实图片 Blob，并重复附加 <code>input_reference</code> 文件字段。</li></ul>
               </article>
             </div>
             <div class="code-panel" style="margin-top:14px"><div class="code-head"><span>上传并获得公网 URL</span><button class="copy-btn" data-copy-key="upload">复制</button></div><pre><code>curl --request POST "https://video.kkone.vip/api/uploads" \
@@ -632,7 +633,7 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
               <tr><td>413</td><td>单文件或请求体超过网关限制</td><td>压缩媒体，或改用可公开访问的 CDN URL。</td></tr>
               <tr><td>429 / 5xx</td><td>限流、上游繁忙、网关暂时异常</td><td>降低并发；已有 task_id 时先查询，不要立即重复创建。</td></tr>
             </tbody></table>
-            <div style="margin-top:14px"><details><summary>常见字段混用</summary><div class="details-body"><p><code>grok-imagine-1.5-video</code> 只接受 multipart 的 <code>input_reference</code> 文件；不要发送 JSON 的 <code>images</code>。</p><p><code>video-v3</code> 原协议不能发送 <code>size</code>、<code>start_frame_url</code> 或 <code>end_frame_url</code>；这些字段仅属于 QY 兼容协议。QY 的首帧或尾帧 URL 不能与 <code>images</code> 同时发送。</p><p><code>MiniMax-H3</code> 当前网页必带 <code>workflow_id</code>；无素材时自动选择 <code>text-to-video</code>，存在素材时自动选择 <code>multi-reference</code>。但 <code>multi-reference</code> 至少需要一张图片，因此仅有视频或音频时应补充图片，或按上游限制手动选择工作流。每个画幅均可在 <code>size</code> 中直接选择 <code>"2K"</code> 或 <code>"4K"</code>；选择这两个超分尺寸时，必须同时发送当前画幅的 <code>aspect_ratio</code>。固定宽x高尺寸不发送 <code>aspect_ratio</code>；<code>cf-*</code> 超分工作流则必须使用 2K 或 4K。网页使用 <code>seconds / size</code> 和 <code>images / reference_videos / reference_audios</code>；不发送 <code>workflow_size</code>、<code>reference_video_audios</code>、<code>mode</code>、<code>clarity</code>、<code>resolution</code>、<code>megapixels</code> 或 <code>metadata.multiple</code>。</p></div></details><details><summary>安全与保存</summary><div class="details-body"><p>API Key 不要写入公开前端源码、仓库或查询参数。参考 URL 必须无需登录即可被上游访问。视频结果最长保留 48 小时，完成后请及时下载或转存。</p></div></details></div>
+            <div style="margin-top:14px"><details><summary>常见字段混用</summary><div class="details-body"><p><code>grok-imagine-1.5-video</code> 只接受 multipart 的 <code>input_reference</code> 文件；不要发送 JSON 的 <code>images</code>。</p><p><code>video-v3</code> 统一使用顶层 <code>prompt</code>、<code>images</code>、<code>videos</code>、<code>audios</code> 数组，不使用旧的 <code>content[]</code> 结构；<code>resolution</code> 固定为 <code>720p</code>。</p><p><code>MiniMax-H3</code> 当前网页隐藏工作流选择器并自动匹配三个工作流：无参考图使用 <code>text-to-video</code>；有参考图且为普通尺寸使用 <code>multi-reference</code>；有参考图且 <code>size</code> 为 <code>"2K"</code> 或 <code>"4K"</code> 使用 <code>cf-multi-reference</code>。仅有视频或音频时不能直接使用参考图工作流，必须补充至少一张图片。选择 2K/4K 时，必须同时发送当前画幅的 <code>aspect_ratio</code>；固定宽x高尺寸不发送该字段。网页使用 <code>seconds / size</code> 和 <code>images / reference_videos / reference_audios</code>；不发送 <code>workflow_size</code>、<code>reference_video_audios</code>、<code>mode</code>、<code>clarity</code>、<code>resolution</code>、<code>megapixels</code> 或 <code>metadata.multiple</code>。</p></div></details><details><summary>安全与保存</summary><div class="details-body"><p>API Key 不要写入公开前端源码、仓库或查询参数。参考 URL 必须无需登录即可被上游访问。视频结果最长保留 48 小时，完成后请及时下载或转存。</p></div></details></div>
           </section>
 
           <section id="codex-setup" class="section">
@@ -829,55 +830,35 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
         },
         {
           id: 'model-minimax', name: 'MiniMax-H3', family: 'openai-video', tone: 'coral', format: 'JSON', method: 'POST', endpoint: '/v1/videos', query: 'GET /v1/videos/{task_id}',
-          summary: 'MiniMax-H3 通过必填 workflow_id 明确生成工作流；网页默认自动选择基础工作流，也可手动指定首尾帧、超分或漫剧工作流。', aliases: 'MiniMax-H3',
-          metrics: [['时长', '4-15s'], ['画幅', '8 种'], ['输出尺寸', '480P / 768P / 1080P / 2K / 4K'], ['参考素材', '9 图 / 3 视频 / 3 音频']],
-          fields: [['model', 'string', '是', '对外模型名称为 MiniMax-H3。'], ['prompt', 'string', '是', '非空视频描述；使用 @参考图N、@参考视频N、@参考音频N 时，页面会编译为数组顺序说明。'], ['workflow_id', 'enum<string>', '是', '请求必须传入。可选 text-to-video、multi-reference、fl2v、cf-multi-reference、cf-fl2v、mj、cf-mj；网页的“自动”最终也会发送解析后的实际值。'], ['seconds', 'integer', '是', '4-15 的整数；页面默认 5。'], ['size', 'string', '是', '每个画幅均可使用下方表中的固定宽x高尺寸、2K 或 4K；默认 1920x1088。cf-* 超分工作流必须传 2K 或 4K。不要发送 workflow_size。'], ['aspect_ratio', 'enum<string>', '2K/4K 时是', '仅在 size 为 2K 或 4K 时发送，值为 16:9、9:16、1:1、2:3、3:2、3:4、4:3 或 21:9；固定宽x高尺寸不发送。'], ['images', 'string[]', '否', '公网图片 URL，最多 9 张。multi-reference/cf-multi-reference 至少 1 张；fl2v/cf-fl2v 需要 1-2 张。'], ['reference_videos', 'string[]', '否', '公网视频 URL，最多 3 段；text-to-video、fl2v/cf-fl2v 不可同时发送。'], ['reference_audios', 'string[]', '否', '独立公网音频 URL，最多 3 段；text-to-video、fl2v/cf-fl2v 不可同时发送。']],
-          rules: ['工作流选择：text-to-video 为纯文生；multi-reference 为至少 1 张图片的参考素材生成；fl2v 为 1-2 张图片的首尾帧生成；cf-multi-reference、cf-fl2v、cf-mj 为对应的超分工作流；mj/cf-mj 为漫剧工作流。', '网页自动规则：没有任何素材时发送 text-to-video；存在参考素材时发送 multi-reference。由于 multi-reference 至少需要 1 张图片，只有视频或音频时不能直接使用自动选择，应补充图片或按上游要求手动选择工作流。', '每个画幅的 size 都提供 2K 与 4K，直接作为 size 提交；选择 2K 或 4K 时必须同时发送对应的 aspect_ratio；cf-multi-reference、cf-fl2v、cf-mj 必须使用 2K 或 4K。', '网页仅在对应素材非空时发送数组字段；同类重复 URL 或文件名会在提交前去重。', '不要混发 workflow_size、resolution、clarity、megapixels、metadata.multiple、mode、reference_video_audios、audio 或 prompt_enhance；固定宽x高 size 不要发送 aspect_ratio。', '图片、视频与音频外链可来自项目临时上传服务，且必须能被上游公网访问。'],
+          summary: 'MiniMax-H3 通过必填 workflow_id 明确生成工作流；网页根据参考图和 2K/4K 尺寸自动匹配三个可用工作流。', aliases: 'MiniMax-H3',
+          metrics: [['时长', '4-15s'], ['画幅', '8 种'], ['输出尺寸', '固定尺寸 / 2K / 4K'], ['参考素材', '9 图 / 3 视频 / 3 音频']],
+          fields: [['model', 'string', '是', '对外模型名称为 MiniMax-H3。'], ['prompt', 'string', '是', '非空视频描述；使用 @参考图N、@参考视频N、@参考音频N 时，页面会编译为数组顺序说明。'], ['workflow_id', 'enum<string>', '是', '由网页按请求自动填写：无参考图为 text-to-video；有参考图且为普通尺寸为 multi-reference；有参考图且 size 为 2K/4K 为 cf-multi-reference。'], ['seconds', 'integer', '是', '4-15 的整数；页面默认 5。'], ['size', 'string', '是', '可选固定宽x高尺寸，或超分标识 2K / 4K。选择 2K / 4K 时，必须同时传入与当前画幅一致的 aspect_ratio。不要发送 workflow_size。'], ['aspect_ratio', 'enum<string>', '2K/4K 时必填', 'size 为 2K 或 4K 时必填，并且必须与所选画幅一致：16:9、9:16、1:1、2:3、3:2、3:4、4:3 或 21:9。使用固定宽x高尺寸时不要发送此字段。'], ['images', 'string[]', '否', '公网图片 URL，最多 9 张。multi-reference/cf-multi-reference 至少 1 张。'], ['reference_videos', 'string[]', '否', '公网视频 URL，最多 3 段；仅有参考视频不能触发参考图工作流，必须同时提供图片。'], ['reference_audios', 'string[]', '否', '独立公网音频 URL，最多 3 段；仅有参考音频不能触发参考图工作流，必须同时提供图片。']],
+          rules: ['【关键配对规则】2K / 4K 不能单独使用：size 选择 2K 或 4K 时，aspect_ratio 必须同时出现，并填写当前画幅值。例如 4K + 9:16 必须同时发送 size="4K" 和 aspect_ratio="9:16"。', '网页隐藏 workflow_id 选择器并自动匹配三个工作流：无参考图使用 text-to-video；有参考图且为普通尺寸使用 multi-reference；有参考图且为 2K/4K 使用 cf-multi-reference。', '参考视频或参考音频不会单独触发 multi-reference；H3 的参考图工作流至少需要一张图片。', '每个画幅的 size 都提供 2K 与 4K，直接作为 size 提交；网页会把当前画幅同步写入 aspect_ratio。', '网页仅在对应素材非空时发送数组字段；同类重复 URL 或文件名会在提交前去重。', '不要混发 workflow_size、resolution、clarity、megapixels、metadata.multiple、mode、reference_video_audios、audio 或 prompt_enhance；固定宽x高 size 不要发送 aspect_ratio。', '图片、视频与音频外链可来自项目临时上传服务，且必须能被上游公网访问。'],
           resolutionGuide: renderMiniMaxH3ResolutionGuide(),
           example: `{
   "model": "MiniMax-H3",
-  "prompt": "让 @参考图1 中的旅人在雪山营地生火，镜头从远景缓慢推近。",
-  "workflow_id": "multi-reference",
-  "seconds": 10,
-  "size": "1920x1088",
+  "prompt": "让 @参考图1 中的女生动起来，镜头保持竖屏构图并缓慢推近。",
+  "workflow_id": "cf-multi-reference",
+  "seconds": 5,
+  "size": "4K",
+  "aspect_ratio": "9:16",
   "images": ["https://cdn.example.com/reference.png"]
 }`,
         },
         {
-          id: 'model-v3', name: 'video-v3 · 原 V3 协议', family: 'openai-video', tone: 'cyan', format: 'JSON', method: 'POST', endpoint: '/v1/videos', query: 'GET /v1/videos/{task_id}',
-          summary: '默认协议：保留 4-30 秒、7 种画幅和固定 720p。携带参考视频或音频时，页面会使用 content[] 多模态格式。', aliases: 'video-v3 / seedance-2.5 / seedance2.5 / sd-2.5 / sd2.5',
-          metrics: [['时长', '4-30s'], ['画幅', '7 种'], ['参考素材', '30 / 10 / 10'], ['清晰度', '固定 720p']],
-          fields: [['model', 'string', '是', '使用上述任一已适配模型名。'], ['duration', 'integer', '是', '4-30 的整数。'], ['ratio', 'string', '是', 'auto、21:9、16:9、4:3、1:1、3:4、9:16。'], ['resolution', 'string', '是', '固定为 720p。'], ['generate_audio', 'boolean', '是', '是否生成音频。'], ['prompt', 'string', '条件', '无视频和音频参考时作为顶层字段发送；不能为空。'], ['images', 'string[]', '条件', '无视频和音频参考时作为顶层字段发送，最多 30 张公网 URL。'], ['content', 'array', '条件', '存在 videos 或 audios 时发送；第一项为 text，其后可为 image_url、video_url、audio_url。'], ['seed', 'integer', '否', '任意安全整数；留空由上游随机。'], ['bypass_face_check', 'boolean', '是', '人脸校验透传开关。'], ['grid_strength', 'number', '否', '素材融合强度，范围 0-1。']],
-          rules: ['只上传图片时，页面发送顶层 prompt 与 images；上传任一视频或音频时，页面改为 content[]，不再发送顶层 prompt、images、videos、audios。', '图片最多 30 张，视频和音频各最多 10 个；每类重复 URL 会在提交前去重。', '原 V3 协议不支持 size、start_frame_url 或 end_frame_url。'],
+          id: 'model-v3', name: 'video-v3', family: 'openai-video', tone: 'cyan', format: 'JSON', method: 'POST', endpoint: '/v1/videos', query: 'GET /v1/videos/{task_id}',
+          summary: '统一使用顶层 prompt、images、videos、audios，并支持首尾帧 URL；resolution 固定为 720p。', aliases: 'video-v3 / seedance-2.5 / seedance2.5 / sd-2.5 / sd2.5',
+          metrics: [['时长', '4-29s'], ['画幅', '3 种'], ['参考素材', '30 / 10 / 10'], ['清晰度', '固定 720p']],
+          fields: [['model', 'string', '是', '使用上述任一已适配模型名。'], ['prompt', 'string', '是', '顶层非空文本。'], ['duration', 'integer', '是', '4-29 的整数。'], ['ratio', 'string', '是', '仅 16:9、1:1、9:16。'], ['resolution', 'string', '是', '固定为 720p，不提供 480p。'], ['images', 'string[]', '否', '最多 30 张公网图片 URL。'], ['videos', 'string[]', '否', '最多 10 个公网视频 URL。'], ['audios', 'string[]', '否', '最多 10 个公网音频 URL。'], ['size', 'string', '否', '宽x高，例如 1280x720。'], ['start_frame_url', 'string', '否', '公网 http/https 首帧 URL。'], ['end_frame_url', 'string', '否', '公网 http/https 尾帧 URL。'], ['generate_audio', 'boolean', '是', '是否生成音频。'], ['seed', 'integer', '否', '0-4294967295；留空由上游随机。'], ['bypass_face_check', 'boolean', '是', '人脸校验透传开关。'], ['grid_strength', 'number', '否', '素材融合强度，范围 0.01-0.5。']],
+          rules: ['始终使用顶层 prompt、images、videos、audios，不发送旧的 content[] 结构。', 'start_frame_url 或 end_frame_url 不能与 images 同时发送，但可与 videos、audios 组合。', '图片最多 30 张，视频和音频各最多 10 个；每类重复 URL 会在提交前去重。', 'resolution 必须固定为 720p；不要发送 480p。'],
           example: `{
   "model": "video-v3",
-  "duration": 10,
-  "ratio": "16:9",
-  "resolution": "720p",
-  "generate_audio": true,
-  "content": [
-    { "type": "text", "text": "保持人物外观一致，动作节奏参考视频，声音氛围参考音频。" },
-    { "type": "image_url", "image_url": { "url": "https://cdn.example.com/person.png" } },
-    { "type": "video_url", "video_url": { "url": "https://cdn.example.com/motion.mp4" } },
-    { "type": "audio_url", "audio_url": { "url": "https://cdn.example.com/ambient.mp3" } }
-  ],
-  "seed": 12345,
-  "grid_strength": 0.6
-}`,
-        },
-        {
-          id: 'model-v3-qy', name: 'video-v3 · QY 兼容协议', family: 'openai-video', tone: 'cyan', format: 'JSON', method: 'POST', endpoint: '/v1/videos', query: 'GET /v1/videos/{task_id}',
-          summary: '可在页面切换的兼容协议：使用顶层 prompt、images、videos、audios，并提供 size 与首尾帧 URL。', aliases: 'video-v3 / seedance-2.5 / seedance2.5 / sd-2.5 / sd2.5；选择“QY 兼容协议”',
-          metrics: [['时长', '4-29s'], ['画幅', '3 种'], ['参考素材', '30 / 10 / 10'], ['清晰度', '480p / 720p']],
-          fields: [['model', 'string', '是', '使用上述任一已适配模型名。'], ['prompt', 'string', '是', '顶层非空文本。'], ['duration', 'integer', '是', '4-29 的整数。'], ['ratio', 'string', '是', '仅 16:9、1:1、9:16。'], ['resolution', 'string', '是', '480p 或 720p；页面默认 480p。'], ['images', 'string[]', '否', '最多 30 张公网图片 URL。'], ['videos', 'string[]', '否', '最多 10 个公网视频 URL。'], ['audios', 'string[]', '否', '最多 10 个公网音频 URL。'], ['size', 'string', '否', '宽x高，例如 1280x720。'], ['start_frame_url', 'string', '否', '公网 http/https 首帧 URL。'], ['end_frame_url', 'string', '否', '公网 http/https 尾帧 URL。'], ['generate_audio', 'boolean', '是', '是否生成音频。'], ['seed', 'integer', '否', '0-4294967295；留空由上游随机。'], ['bypass_face_check', 'boolean', '是', '人脸校验透传开关。'], ['grid_strength', 'number', '否', '素材融合强度，范围 0.01-0.5。']],
-          rules: ['QY 兼容协议始终使用顶层 prompt、images、videos、audios，不发送 content[]。', 'start_frame_url 或 end_frame_url 不能与 images 同时发送，但可与 videos、audios 组合。', '图片最多 30 张，视频和音频各最多 10 个；每类重复 URL 会在提交前去重。'],
-          example: `{
-  "model": "video-v3",
-  "prompt": "保持人物外观一致，动作节奏参考视频，声音氛围参考音频。",
   "duration": 10,
   "ratio": "16:9",
   "resolution": "720p",
   "size": "1280x720",
+  "prompt": "保持人物外观一致，动作节奏参考视频，声音氛围参考音频。",
+  "images": ["https://cdn.example.com/person.png"],
   "videos": ["https://cdn.example.com/motion.mp4"],
   "audios": ["https://cdn.example.com/ambient.mp3"],
   "generate_audio": true,
@@ -942,7 +923,7 @@ if (['success', 'succeeded', 'completed'].includes(status)) {
           <details class="resolution-guide">
             <summary>查看 H3 尺寸速查</summary>
             <div class="resolution-guide-body">
-              <p class="resolution-guide-note">每个画幅都提供下表三档固定宽x高值，以及 <code>2K</code>、<code>4K</code>。所有工作流均直接通过 <code>size</code> 提交；选择 <code>2K</code> 或 <code>4K</code> 时，必须同时提交当前画幅的 <code>aspect_ratio</code>；<code>cf-*</code> 超分工作流必须选择 <code>2K</code> 或 <code>4K</code>。</p>
+              <p class="resolution-guide-note"><strong>2K / 4K 配对说明：</strong>每个画幅都提供下表三档固定宽x高值，以及 <code>2K</code>、<code>4K</code>。选择 <code>2K</code> 或 <code>4K</code> 时，必须把当前画幅一并写入 <code>aspect_ratio</code>（例如竖屏请求为 <code>size: "4K"</code> + <code>aspect_ratio: "9:16"</code>）。<code>workflow_id</code> 由网页自动匹配：无参考图使用 <code>text-to-video</code>；有参考图且为普通尺寸使用 <code>multi-reference</code>；有参考图且为 2K/4K 使用 <code>cf-multi-reference</code>。</p>
               ${fixedSizes}
             </div>
           </details>

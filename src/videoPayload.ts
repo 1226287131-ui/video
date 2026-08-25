@@ -7,7 +7,6 @@ import {
   isValidMiniMaxH3VideoSize,
   isMiniMaxH3SuperResolutionSize,
   inferMiniMaxH3WorkflowId,
-  isValidMiniMaxH3WorkflowId,
   isValidMiniMaxH3WorkflowSize,
   MINIMAX_H3_DEFAULT_SECONDS,
   MINIMAX_H3_MAX_AUDIOS,
@@ -429,13 +428,6 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
     MINIMAX_H3_MAX_AUDIOS,
   )
 
-  const requestedWorkflow = input.workflowId ?? input.workflow_id ?? 'auto'
-  if (requestedWorkflow !== 'auto' && !isValidMiniMaxH3WorkflowId(requestedWorkflow)) {
-    throw new Error('MiniMax-H3 的 workflow_id 无效')
-  }
-  const workflowId: MiniMaxH3WorkflowId = requestedWorkflow === 'auto'
-    ? inferMiniMaxH3WorkflowId({ images: images.length, videos: referenceVideos.length, audios: referenceAudios.length + referenceVideoAudios.length, mode: input.mode })
-    : requestedWorkflow
   const workflowSizeValue = input.workflowSize ?? input.workflow_size
   const workflowSize = workflowSizeValue === undefined || workflowSizeValue === ''
     ? undefined
@@ -443,12 +435,19 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
   if (workflowSize !== undefined && !isValidMiniMaxH3WorkflowSize(workflowSize)) {
     throw new Error('MiniMax-H3 的超分 size 只能是 2K 或 4K')
   }
-  const usesSuperResolution = workflowId.startsWith('cf-')
   const effectiveSize = workflowSize ?? size
+  // workflow_id is intentionally derived from the actual request. The
+  // historical workflowId/workflow_id fields remain accepted for callers
+  // that still send them, but cannot override the three supported rules.
+  const workflowId: MiniMaxH3WorkflowId = inferMiniMaxH3WorkflowId({
+    images: images.length,
+    videos: referenceVideos.length,
+    audios: referenceAudios.length + referenceVideoAudios.length,
+    size: effectiveSize,
+    mode: input.mode,
+  })
+  const usesSuperResolution = workflowId === 'cf-multi-reference'
   const requiresAspectRatio = isMiniMaxH3SuperResolutionSize(effectiveSize)
-  if (usesSuperResolution && !isMiniMaxH3SuperResolutionSize(effectiveSize)) {
-    throw new Error('MiniMax-H3 的 cf 工作流必须选择 2K 或 4K size')
-  }
   if (!usesSuperResolution && workflowSize) {
     throw new Error('MiniMax-H3 请使用 size 传入 2K 或 4K，不要发送 workflow_size')
   }
@@ -461,13 +460,6 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
   if (workflowId === 'multi-reference' || workflowId === 'cf-multi-reference') {
     if (images.length < 1) throw new Error(`MiniMax-H3 的 ${workflowId} 工作流至少需要 1 张参考图`)
   }
-  if (workflowId === 'fl2v' || workflowId === 'cf-fl2v') {
-    if (images.length < 1 || images.length > 2) throw new Error(`MiniMax-H3 的 ${workflowId} 工作流需要 1-2 张参考图`)
-    if (referenceVideos.length || referenceVideoAudios.length || referenceAudios.length) {
-      throw new Error(`MiniMax-H3 的 ${workflowId} 工作流不能同时使用参考视频或参考音频`)
-    }
-  }
-
   if (input.mode !== undefined && input.mode !== 'first_last_frame') {
     throw new Error('MiniMax-H3 的 mode 仅支持 first_last_frame')
   }

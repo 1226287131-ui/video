@@ -67,15 +67,11 @@ export const MINIMAX_H3_DEFAULT_SECONDS = 5
 export const MINIMAX_H3_MIN_MULTIPLE = 8
 export const MINIMAX_H3_MAX_MULTIPLE = 128
 
-/** Workflow IDs documented by the MiniMax-H3 upstream contract. */
+/** Workflow IDs used by the H3 editor and its automatic submission rules. */
 export const MINIMAX_H3_WORKFLOW_IDS = [
   'text-to-video',
   'multi-reference',
-  'fl2v',
   'cf-multi-reference',
-  'cf-fl2v',
-  'mj',
-  'cf-mj',
 ] as const
 
 export type MiniMaxH3WorkflowId = typeof MINIMAX_H3_WORKFLOW_IDS[number]
@@ -102,10 +98,14 @@ export function inferMiniMaxH3WorkflowId(input: {
   images: number
   videos: number
   audios: number
+  size?: unknown
   mode?: 'first_last_frame'
 }): MiniMaxH3WorkflowId {
-  if (input.mode === 'first_last_frame') return 'fl2v'
-  return input.images + input.videos + input.audios > 0 ? MINIMAX_H3_DEFAULT_WORKFLOW_ID : 'text-to-video'
+  // H3's supported workflows are selected from the media the user can
+  // actually provide. Reference videos/audio do not select a reference
+  // workflow on their own because those workflows require at least one image.
+  if (input.images <= 0) return 'text-to-video'
+  return isMiniMaxH3SuperResolutionSize(input.size) ? 'cf-multi-reference' : MINIMAX_H3_DEFAULT_WORKFLOW_ID
 }
 
 export type MiniMaxH3MediaMentionCounts = {

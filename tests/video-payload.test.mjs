@@ -269,6 +269,33 @@ test('automatically selects H3 workflow_id from the submitted media', () => {
     images: ['https://example.com/a.jpg'],
   })
   assert.equal(referencePayload.workflow_id, 'multi-reference')
+
+  const superResolutionPayload = buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '2K 参考图镜头',
+    seconds: 5,
+    size: '2K',
+    aspect_ratio: '16:9',
+    images: ['https://example.com/a.jpg'],
+  })
+  assert.equal(superResolutionPayload.workflow_id, 'cf-multi-reference')
+
+  const fourKPayload = buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '4K 参考图镜头',
+    seconds: 5,
+    size: '4K',
+    aspect_ratio: '9:16',
+    images: ['https://example.com/a.jpg'],
+  })
+  assert.equal(fourKPayload.workflow_id, 'cf-multi-reference')
+
+  assert.throws(() => buildMiniMaxH3SubmitPayload({
+    model: 'MiniMax-H3',
+    prompt: '只有参考视频',
+    seconds: 5,
+    referenceVideos: ['https://example.com/a.mp4'],
+  }), /text-to-video 工作流不能携带参考素材/)
 })
 
 test('sends H3 2K/4K size values with the selected aspect ratio and requires them for cf workflows', () => {
@@ -287,7 +314,6 @@ test('sends H3 2K/4K size values with the selected aspect ratio and requires the
     model: 'MiniMax-H3',
     prompt: '超分参考图',
     seconds: 5,
-    workflow_id: 'cf-multi-reference',
     size: '4K',
     aspectRatio: '16:9',
     images: ['https://example.com/a.jpg'],
@@ -312,20 +338,21 @@ test('sends H3 2K/4K size values with the selected aspect ratio and requires the
     size: '2K',
   }), /必须传入有效的 aspect_ratio/)
 
-  assert.throws(() => buildMiniMaxH3SubmitPayload({
+  const standardReferencePayload = buildMiniMaxH3SubmitPayload({
     model: 'MiniMax-H3',
-    prompt: '缺少超分尺寸',
+    prompt: '普通参考图尺寸',
     seconds: 5,
-    workflow_id: 'cf-multi-reference',
     images: ['https://example.com/a.jpg'],
-  }), /必须选择 2K 或 4K/)
-  assert.throws(() => buildMiniMaxH3SubmitPayload({
+  })
+  assert.equal(standardReferencePayload.workflow_id, 'multi-reference')
+  const ignoredWorkflowPayload = buildMiniMaxH3SubmitPayload({
     model: 'MiniMax-H3',
-    prompt: '文字不能带素材',
+    prompt: '工作流由素材自动决定',
     seconds: 5,
     workflow_id: 'text-to-video',
     images: ['https://example.com/a.jpg'],
-  }), /不能携带参考素材/)
+  })
+  assert.equal(ignoredWorkflowPayload.workflow_id, 'multi-reference')
 })
 
 test('deduplicates MiniMax references by URL and file name', () => {

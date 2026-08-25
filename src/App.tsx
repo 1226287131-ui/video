@@ -87,7 +87,6 @@ import {
   MINIMAX_H3_DEFAULT_ASPECT_RATIO,
   MINIMAX_H3_DEFAULT_SIZE,
   MINIMAX_H3_DEFAULT_SECONDS,
-  MINIMAX_H3_WORKFLOW_IDS,
   inferMiniMaxH3WorkflowId,
   type MiniMaxH3WorkflowId,
   type MiniMaxH3WorkflowSelection,
@@ -1137,16 +1136,6 @@ function VideoStudioApp() {
       const nextSize = nextSizes[Math.min(currentSizeIndex, nextSizes.length - 1)] ?? MINIMAX_H3_DEFAULT_SIZE
       return { ...current, ratio: nextRatio, size: nextSize }
     })
-  }
-
-  function updateMiniMaxWorkflow(nextWorkflow: MiniMaxH3WorkflowSelection) {
-    setForm((current) => ({
-      ...current,
-      miniMaxWorkflow: nextWorkflow,
-      size: nextWorkflow.startsWith('cf-') && !isMiniMaxH3SuperResolutionSize(current.size)
-        ? '2K'
-        : current.size,
-    }))
   }
 
   function changeVideoV3Protocol(nextProtocol: VideoV3Protocol) {
@@ -2555,13 +2544,12 @@ function VideoStudioApp() {
       ? miniMaxVideos.map((item) => item.url)
       : videoV2Videos.map((item) => item.url)
     const resolvedMiniMaxWorkflowId = useMiniMaxApi
-      ? formSnapshot.miniMaxWorkflow === 'auto'
-        ? inferMiniMaxH3WorkflowId({
-            images: referenceUrls.length,
-            videos: referenceVideoUrls.length,
-            audios: referenceAudioUrls.length + referenceVideoAudioUrls.length,
-          })
-        : formSnapshot.miniMaxWorkflow
+      ? inferMiniMaxH3WorkflowId({
+          images: referenceUrls.length,
+          videos: referenceVideoUrls.length,
+          audios: referenceAudioUrls.length + referenceVideoAudioUrls.length,
+          size: formSnapshot.size,
+        })
       : undefined
     const referenceUploadIds = submissionMode === 'image' && (useVideoResourceApi || useMiniMaxApi || submissionImageSourceMode === 'upload')
       ? (useVideoResourceApi
@@ -2767,7 +2755,6 @@ function VideoStudioApp() {
             seconds: formSnapshot.duration,
             size: formSnapshot.size,
             aspectRatio: formSnapshot.ratio,
-            workflowId: formSnapshot.miniMaxWorkflow,
             images: referenceUrls,
             referenceVideos: referenceVideoUrls,
             referenceAudios: referenceAudioUrls,
@@ -4032,21 +4019,9 @@ function VideoStudioApp() {
                         <span className="field-hint">每个画幅均提供固定分辨率及 2K/4K；选择 2K/4K 时会同时发送当前画幅的 aspect_ratio。</span>
                       )}
                     </div>
-                    <div className="options-group minimax-option-group">
-                      <label className="options-group-label" htmlFor="minimax-workflow"><Settings2 size={14} /> workflow_id</label>
-                      <select
-                        id="minimax-workflow"
-                        className="minimax-select"
-                        value={form.miniMaxWorkflow}
-                        onChange={(event) => updateMiniMaxWorkflow(event.target.value as MiniMaxH3WorkflowSelection)}
-                      >
-                        <option value="auto">自动选择（推荐）</option>
-                        {MINIMAX_H3_WORKFLOW_IDS.map((workflow) => <option key={workflow} value={workflow}>{workflow}</option>)}
-                      </select>
-                      <span className="field-hint">
-                        自动规则：无素材使用 text-to-video；有参考图/视频/音频使用 multi-reference。选择 cf-* 时会自动切换为 2K，可在输出尺寸中改为 4K。
-                      </span>
-                    </div>
+                    <span className="field-hint minimax-workflow-hint">
+                      系统会根据是否上传参考图以及是否选择 2K/4K，自动匹配合适的生成流程。
+                    </span>
                   </>
                 ) : videoV3ModelSelected ? (
                   <>
