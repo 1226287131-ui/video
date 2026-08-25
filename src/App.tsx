@@ -3887,12 +3887,12 @@ function VideoStudioApp() {
                   </div>
                 </section>
 
-                <section className="settings-section settings-section--base" aria-labelledby="base-generation-settings-title">
+                <section className={`settings-section settings-section--base ${miniMaxModelSelected ? 'settings-section--minimax' : ''}`} aria-labelledby="base-generation-settings-title">
                   <header className="settings-section-header">
                     <h3 id="base-generation-settings-title" className="settings-section-title"><Clock size={15} /> 基础生成</h3>
                   </header>
                   <div className="settings-section-grid settings-section-grid--base">
-                <div className={`options-group ${grokModelSelected ? 'grok-option-group' : ''}`}>
+                <div className={`options-group ${grokModelSelected ? 'grok-option-group' : ''} ${miniMaxModelSelected ? 'minimax-duration-group' : ''}`}>
                   <span className="options-group-label"><Clock size={14} /> 渲染时长</span>
                   {miniMaxModelSelected ? (
                     <div className="minimax-duration-control">
@@ -3979,7 +3979,7 @@ function VideoStudioApp() {
                   </div>
                 </section>
 
-                <section className="settings-section settings-section--model" aria-labelledby="model-settings-title">
+                <section className={`settings-section settings-section--model ${miniMaxModelSelected ? 'settings-section--minimax' : ''}`} aria-labelledby="model-settings-title">
                   <header className="settings-section-header">
                     <h3 id="model-settings-title" className="settings-section-title"><Cpu size={15} /> 模型专属参数</h3>
                   </header>
