@@ -5,6 +5,7 @@ import {
   getVideoContentPath,
   getVideoSubmitPath,
   getVideoTaskPath,
+  isVideoV2FastModel,
   isVideoV2Model,
 } from '../src/videoApi.ts'
 import { buildVideoV2SubmitPayload } from '../src/videoPayload.ts'
@@ -22,6 +23,13 @@ test('recognizes supported video-v2 models without case sensitivity', () => {
   assert.equal(isVideoV2Model('video-v2-mini-720'), false)
   assert.equal(isVideoV2Model('video-v20'), false)
   assert.equal(isVideoV2Model('video-v1'), false)
+})
+
+test('identifies video-v2-fast as the fast adapter alias without broadening the match', () => {
+  assert.equal(isVideoV2FastModel('video-v2-fast'), true)
+  assert.equal(isVideoV2FastModel(' VIDEO-V2-FAST '), true)
+  assert.equal(isVideoV2FastModel('video-v2'), false)
+  assert.equal(isVideoV2FastModel('video-v2-fast-720'), false)
 })
 
 test('routes video-v2 resources through /v1/videos while legacy routing is unchanged', () => {

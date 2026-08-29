@@ -4,9 +4,12 @@ export const VIDEO_V2_MEDIA_LIMITS = {
   audios: 3,
 } as const
 
+/** Canonical model ids handled by the shared Video V2 adapter. */
+export const VIDEO_V2_MODEL = 'video-v2' as const
+export const VIDEO_V2_FAST_MODEL = 'video-v2-fast' as const
 export const VIDEO_V2_MODELS = [
-  'video-v2',
-  'video-v2-fast',
+  VIDEO_V2_MODEL,
+  VIDEO_V2_FAST_MODEL,
 ] as const
 
 export type VideoV2MediaCounts = {
@@ -43,6 +46,10 @@ function getSafeCount(value: number) {
 export function isVideoV2Model(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
   return VIDEO_V2_MODELS.some((candidate) => candidate === normalizedModel)
+}
+
+export function isVideoV2FastModel(model: unknown) {
+  return String(model || '').trim().toLowerCase() === VIDEO_V2_FAST_MODEL
 }
 
 function analyzeVideoV2Mentions(prompt: string, counts: VideoV2MediaCounts): VideoV2MentionResult {

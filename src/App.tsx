@@ -125,7 +125,7 @@ import {
   MAX_PROMPT_FILE_BYTES,
   mergeImportedPrompt,
 } from './promptFileImport'
-import { getReplacementModelId } from './modelSelection'
+import { getMissingVideoV2ModelIds, getReplacementModelId } from './modelSelection'
 
 type VideoDuration = number
 type VideoRatio = 'auto' | '21:9' | '16:9' | '9:16' | '1:1' | '4:3' | '3:4' | '2:3' | '3:2'
@@ -939,9 +939,22 @@ function VideoStudioApp() {
           return id.includes('video') || id.includes('sora') || id.includes('runway') || id.includes('kling') || id.includes('minimax') || id.includes('h3') || id.includes('seedance') || id.includes('sd2.5') || id.includes('sd-2.5')
         })
         const targetModels = videoModels.length > 0 ? videoModels : items
-        
-        setModels(targetModels)
-        setMessage(`成功加载可用模型（共 ${targetModels.length} 个）`)
+        // Keep the two V2 aliases selectable even when the gateway's model
+        // listing is incomplete. The submit adapter already validates and
+        // routes both ids through the same /v1/videos contract.
+        const missingVideoV2Models = getMissingVideoV2ModelIds(targetModels)
+        const enrichedModels = [
+          ...targetModels,
+          ...missingVideoV2Models.map((id) => ({
+            id,
+            object: 'model',
+            created: 0,
+            owned_by: 'video-v2-adapter',
+          })),
+        ]
+
+        setModels(enrichedModels)
+        setMessage(`成功加载可用模型（共 ${enrichedModels.length} 个）`)
       }
     } catch (err) {
       console.error('获取模型失败:', err)

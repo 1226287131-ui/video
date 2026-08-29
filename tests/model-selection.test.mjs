@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getReplacementModelId } from '../src/modelSelection.ts'
+import { getMissingVideoV2ModelIds, getReplacementModelId } from '../src/modelSelection.ts'
 
 test('uses the first available model when the stored model has been taken offline', () => {
   const replacement = getReplacementModelId('video-v1', [
@@ -27,4 +27,10 @@ test('uses the API canonical id when only its letter casing changes', () => {
   ])
 
   assert.equal(replacement, 'grok-imagine-1.5-video')
+})
+
+test('keeps both Video V2 aliases selectable when the gateway omits them', () => {
+  assert.deepEqual(getMissingVideoV2ModelIds([{ id: 'video-v2' }]), ['video-v2-fast'])
+  assert.deepEqual(getMissingVideoV2ModelIds([{ id: 'VIDEO-V2' }, { id: 'VIDEO-V2-FAST' }]), [])
+  assert.deepEqual(getMissingVideoV2ModelIds([]), ['video-v2', 'video-v2-fast'])
 })

@@ -1,3 +1,5 @@
+import { VIDEO_V2_MODELS } from './v2Media.ts'
+
 type AvailableModel = {
   id?: unknown
 }
@@ -22,4 +24,18 @@ export function getReplacementModelId(currentModel: unknown, models: readonly Av
     modelId.toLowerCase() === currentModelId.toLowerCase()
   ))
   return canonicalMatch || availableModelIds[0]
+}
+
+/**
+ * The gateway may omit an enabled V2 alias from /v1/models even though the
+ * video endpoint accepts it. Return only aliases that still need adding so
+ * callers can preserve upstream metadata and avoid duplicates.
+ */
+export function getMissingVideoV2ModelIds(models: readonly AvailableModel[]) {
+  const availableIds = new Set(
+    models
+      .map((model) => normalizeModelId(model?.id).toLowerCase())
+      .filter(Boolean),
+  )
+  return VIDEO_V2_MODELS.filter((modelId) => !availableIds.has(modelId))
 }
