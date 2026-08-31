@@ -1,5 +1,6 @@
 export const VIDEO_V3_MODELS = [
   'video-v3',
+  'wan-3.0',
   'seedance-2.5',
   'seedance2.5',
   'sd-2.5',

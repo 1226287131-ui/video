@@ -936,7 +936,7 @@ function VideoStudioApp() {
         // 这里尝试过滤一下只含有视频属性的模型，如果没有特殊属性就全展出
         const videoModels = items.filter((m: ModelInfo) => {
           const id = String(m.id || '').toLowerCase()
-          return id.includes('video') || id.includes('sora') || id.includes('runway') || id.includes('kling') || id.includes('minimax') || id.includes('h3') || id.includes('seedance') || id.includes('sd2.5') || id.includes('sd-2.5')
+          return id === 'wan-3.0' || id.includes('video') || id.includes('sora') || id.includes('runway') || id.includes('kling') || id.includes('minimax') || id.includes('h3') || id.includes('seedance') || id.includes('sd2.5') || id.includes('sd-2.5')
         })
         const targetModels = videoModels.length > 0 ? videoModels : items
         // Keep the two V2 aliases selectable even when the gateway's model

@@ -23,7 +23,7 @@ import {
 } from '../src/videoV3.ts'
 
 test('recognizes every documented SD2.5 model alias and routes it through /v1/videos', () => {
-  for (const model of ['video-v3', 'Seedance-2.5', 'seedance2.5', 'SD-2.5', ' sd2.5 ']) {
+  for (const model of ['video-v3', 'WAN-3.0', 'Seedance-2.5', 'seedance2.5', 'SD-2.5', ' sd2.5 ']) {
     assert.equal(isVideoV3Model(model), true)
     assert.equal(getVideoSubmitPath(model), '/v1/videos')
     assert.equal(getVideoTaskPath(model, 'task/a'), '/v1/videos/task%2Fa')
@@ -81,6 +81,25 @@ test('uses documented top-level prompt and images for image-only video-v3 reques
   for (const unsupportedField of ['seconds', 'aspect_ratio', 'quality', 'async', 'content', 'input_reference', 'videos', 'audios']) {
     assert.equal(unsupportedField in payload, false)
   }
+})
+
+test('uses the same video-v3 adapter and payload contract for wan-3.0', () => {
+  const payload = buildVideoV3SubmitPayload({
+    model: 'wan-3.0',
+    prompt: '生成一段平稳推进的城市夜景视频。',
+    duration: 8,
+    ratio: '16:9',
+    images: [],
+    videos: [],
+    audios: [],
+    generateAudio: true,
+  })
+
+  assert.equal(payload.model, 'wan-3.0')
+  assert.equal(payload.duration, 8)
+  assert.equal(payload.ratio, '16:9')
+  assert.equal(payload.resolution, '720p')
+  assert.equal(payload.generate_audio, true)
 })
 
 test('uses QY top-level media arrays without changing the original wire contract', () => {
