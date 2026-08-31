@@ -100,17 +100,11 @@ import {
 } from './minimaxH3'
 import {
   isValidVideoV3DurationForProtocol,
-  isValidVideoV3GridStrengthForProtocol,
-  isValidVideoV3RatioForProtocol,
   VIDEO_V3_MAX_DURATION,
   VIDEO_V3_MEDIA_LIMITS,
   VIDEO_V3_MIN_DURATION,
   VIDEO_V3_RATIOS,
   VIDEO_V3_DEFAULT_RESOLUTION,
-  VIDEO_V3_QY_DEFAULT_RESOLUTION,
-  VIDEO_V3_QY_MAX_DURATION,
-  VIDEO_V3_QY_RATIOS,
-  VIDEO_V3_RESOLUTIONS,
   type VideoV3Protocol,
 } from './videoV3'
 import {
@@ -379,11 +373,6 @@ const videoV3DurationPresets: VideoDuration[] = Array.from(
   (_, index) => index + VIDEO_V3_MIN_DURATION,
 )
 const videoV3RatioPresets: VideoRatio[] = [...VIDEO_V3_RATIOS]
-const videoV3QyDurationPresets: VideoDuration[] = Array.from(
-  { length: VIDEO_V3_QY_MAX_DURATION - VIDEO_V3_MIN_DURATION + 1 },
-  (_, index) => index + VIDEO_V3_MIN_DURATION,
-)
-const videoV3QyRatioPresets: VideoRatio[] = [...VIDEO_V3_QY_RATIOS]
 const grokRatioPresets: VideoRatio[] = ['16:9', '9:16', '1:1', '4:3', '3:4', '2:3', '3:2']
 const qualityPresets: VideoQuality[] = ['hd', 'sd']
 const videoResolutionPresets: VideoResolution[] = ['480p', '720p', '1080p']
@@ -807,7 +796,7 @@ function VideoStudioApp() {
       maxItems: getVideoV2MediaLimit(kind),
       ...(kind === 'image' ? videoV2ImageSizeLimit : {}),
     }
-    if (!videoV3ModelSelected || form.videoV3Protocol !== 'qy') return config
+    if (!videoV3ModelSelected) return config
     if (kind === 'audio') {
       return {
         ...config,
@@ -880,6 +869,7 @@ function VideoStudioApp() {
           : [])
       if (records.length === 0) return
       const parsed = records[0]
+      const restoredVideoV3 = isVideoV3Model(parsed.model)
       setSelectedTaskId(parsed.task_id)
       setHistory(records)
       setForm((current) => ({
@@ -892,14 +882,14 @@ function VideoStudioApp() {
           ? parsed.workflow_size
           : parsed.size ?? current.size,
         miniMaxWorkflow: parsed.workflow_id ?? current.miniMaxWorkflow,
-        videoV3Size: parsed.video_v3_size ?? current.videoV3Size,
-        startFrameUrl: parsed.start_frame_url ?? current.startFrameUrl,
-        endFrameUrl: parsed.end_frame_url ?? current.endFrameUrl,
-        videoV3Protocol: parsed.video_v3_protocol ?? current.videoV3Protocol,
-        generateAudio: parsed.generate_audio ?? current.generateAudio,
-        seed: parsed.seed ?? current.seed,
-        bypassFaceCheck: parsed.bypass_face_check ?? current.bypassFaceCheck,
-        gridStrength: parsed.grid_strength ?? current.gridStrength,
+        videoV3Size: restoredVideoV3 ? '' : parsed.video_v3_size ?? current.videoV3Size,
+        startFrameUrl: restoredVideoV3 ? '' : parsed.start_frame_url ?? current.startFrameUrl,
+        endFrameUrl: restoredVideoV3 ? '' : parsed.end_frame_url ?? current.endFrameUrl,
+        videoV3Protocol: restoredVideoV3 ? 'legacy' : parsed.video_v3_protocol ?? current.videoV3Protocol,
+        generateAudio: restoredVideoV3 ? true : parsed.generate_audio ?? current.generateAudio,
+        seed: restoredVideoV3 ? '' : parsed.seed ?? current.seed,
+        bypassFaceCheck: restoredVideoV3 ? false : parsed.bypass_face_check ?? current.bypassFaceCheck,
+        gridStrength: restoredVideoV3 ? '' : parsed.grid_strength ?? current.gridStrength,
       }))
       setMessage(`已恢复最近任务：${parsed.task_id}`)
       window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(records))
@@ -1050,12 +1040,12 @@ function VideoStudioApp() {
   const selectedTaskUsesProtectedContent = Boolean(task && getVideoContentPath(task.model, task.task_id) && !task.result_url)
   const resultHref = selectedTaskUsesProtectedContent ? grokVideoObjectUrl : resolveVideoHref(task?.result_url)
   const visibleDurationPresets = videoV3ModelSelected
-    ? form.videoV3Protocol === 'qy' ? videoV3QyDurationPresets : videoV3DurationPresets
+    ? videoV3DurationPresets
     : grokModelSelected
     ? grokDurationPresets
     : durationPresets
   const visibleRatioPresets = videoV3ModelSelected
-    ? form.videoV3Protocol === 'qy' ? videoV3QyRatioPresets : videoV3RatioPresets
+    ? videoV3RatioPresets
     : grokModelSelected
     ? grokRatioPresets
     : videoV2ModelSelected
@@ -1151,36 +1141,6 @@ function VideoStudioApp() {
     })
   }
 
-  function changeVideoV3Protocol(nextProtocol: VideoV3Protocol) {
-    setForm((current) => {
-      if (current.videoV3Protocol === nextProtocol) return current
-      const isQy = nextProtocol === 'qy'
-      const duration = isQy
-        ? Math.min(current.duration, VIDEO_V3_QY_MAX_DURATION)
-        : current.duration
-      const ratio = isQy && !isValidVideoV3RatioForProtocol(current.ratio, 'qy')
-        ? '16:9'
-        : current.ratio
-      const resolution = isQy
-        ? (current.resolution === '720p' ? '720p' : VIDEO_V3_QY_DEFAULT_RESOLUTION)
-        : VIDEO_V3_DEFAULT_RESOLUTION
-      const gridStrength = isQy && current.gridStrength !== '' && !isValidVideoV3GridStrengthForProtocol(current.gridStrength, 'qy')
-        ? ''
-        : current.gridStrength
-      return {
-        ...current,
-        videoV3Protocol: nextProtocol,
-        duration,
-        ratio,
-        resolution,
-        gridStrength,
-        videoV3Size: isQy ? current.videoV3Size : '',
-        startFrameUrl: isQy ? current.startFrameUrl : '',
-        endFrameUrl: isQy ? current.endFrameUrl : '',
-      }
-    })
-  }
-
   const changeModel = useCallback((nextModel: string) => {
     if (isMiniMaxH3VideoModel(nextModel)) {
       setForm((current) => {
@@ -1217,10 +1177,16 @@ function VideoStudioApp() {
         resolution: VIDEO_V3_DEFAULT_RESOLUTION,
         generateAudio: true,
         videoV3Protocol: 'legacy',
+        videoV3Size: '',
+        startFrameUrl: '',
+        endFrameUrl: '',
+        seed: '',
+        bypassFaceCheck: false,
+        gridStrength: '',
       }))
       setImageInputMode('multiple')
       setImageSourceMode('upload')
-      setMessage(`SD2.5 / ${nextModel} 默认保留原协议：4-30 秒、720p；也可切换 QY 协议使用 480p/720p 与扩展参数`)
+      setMessage(`${nextModel} 使用 video-v3 原协议：4-30 秒、720p`)
       return
     }
 
@@ -2157,14 +2123,14 @@ function VideoStudioApp() {
             })()
           : item.size ?? current.size,
         miniMaxWorkflow: item.workflow_id ?? current.miniMaxWorkflow,
-        videoV3Size: item.video_v3_size ?? current.videoV3Size,
-        startFrameUrl: item.start_frame_url ?? current.startFrameUrl,
-        endFrameUrl: item.end_frame_url ?? current.endFrameUrl,
-        videoV3Protocol: item.video_v3_protocol ?? current.videoV3Protocol,
-        generateAudio: item.generate_audio ?? current.generateAudio,
-        seed: item.seed ?? current.seed,
-        bypassFaceCheck: item.bypass_face_check ?? current.bypassFaceCheck,
-        gridStrength: item.grid_strength ?? current.gridStrength,
+        videoV3Size: historyUsesVideoV3 ? '' : item.video_v3_size ?? current.videoV3Size,
+        startFrameUrl: historyUsesVideoV3 ? '' : item.start_frame_url ?? current.startFrameUrl,
+        endFrameUrl: historyUsesVideoV3 ? '' : item.end_frame_url ?? current.endFrameUrl,
+        videoV3Protocol: historyUsesVideoV3 ? 'legacy' : item.video_v3_protocol ?? current.videoV3Protocol,
+        generateAudio: historyUsesVideoV3 ? true : item.generate_audio ?? current.generateAudio,
+        seed: historyUsesVideoV3 ? '' : item.seed ?? current.seed,
+        bypassFaceCheck: historyUsesVideoV3 ? false : item.bypass_face_check ?? current.bypassFaceCheck,
+        gridStrength: historyUsesVideoV3 ? '' : item.grid_strength ?? current.gridStrength,
         model: item.model || current.model,
     }))
     setConsoleCollapsed(false)
@@ -2609,47 +2575,14 @@ function VideoStudioApp() {
     }
 
     if (useVideoV3Api) {
-      const v3Protocol = formSnapshot.videoV3Protocol
-      const v3MaxDuration = v3Protocol === 'qy' ? VIDEO_V3_QY_MAX_DURATION : VIDEO_V3_MAX_DURATION
+      const v3Protocol: VideoV3Protocol = 'legacy'
       if (!isValidVideoV3DurationForProtocol(formSnapshot.duration, v3Protocol)) {
-        setMessage(`${v3Protocol === 'qy' ? 'QY' : '原'} video-v3 协议的时长必须是 ${VIDEO_V3_MIN_DURATION} 到 ${v3MaxDuration} 秒之间的整数`)
+        setMessage(`原 video-v3 协议的时长必须是 ${VIDEO_V3_MIN_DURATION} 到 ${VIDEO_V3_MAX_DURATION} 秒之间的整数`)
         setShowSettings(true)
         return
       }
-      if (!isValidVideoV3RatioForProtocol(formSnapshot.ratio, v3Protocol)) {
-        setMessage(v3Protocol === 'qy' ? 'QY 协议仅支持 16:9、1:1 或 9:16 画幅' : '原 video-v3 协议不支持该画幅')
-        setShowSettings(true)
-        return
-      }
-      const invalidSeed = formSnapshot.seed !== '' && (
-        !Number.isSafeInteger(formSnapshot.seed) ||
-        (v3Protocol === 'qy' && (formSnapshot.seed < 0 || formSnapshot.seed > 4294967295))
-      )
-      if (invalidSeed) {
-        setMessage(v3Protocol === 'qy' ? 'QY 协议的 seed 必须是 0 到 4294967295 之间的整数，留空则由上游随机生成' : '原 video-v3 协议的 seed 必须是整数，留空则由上游随机生成')
-        setShowSettings(true)
-        return
-      }
-      if (formSnapshot.gridStrength !== '' && !isValidVideoV3GridStrengthForProtocol(formSnapshot.gridStrength, v3Protocol)) {
-        setMessage(v3Protocol === 'qy' ? 'QY 协议的 grid_strength 必须在 0.01 到 0.5 之间' : '原 video-v3 协议的 grid_strength 必须在 0 到 1 之间')
-        setShowSettings(true)
-        return
-      }
-      if (v3Protocol === 'qy' && formSnapshot.videoV3Size.trim() && !/^\d+x\d+$/i.test(formSnapshot.videoV3Size.trim())) {
-        setMessage('video-v3 的 size 必须是宽x高格式，例如 1280x720')
-        setShowSettings(true)
-        return
-      }
-      const frameUrls = v3Protocol === 'qy'
-        ? [formSnapshot.startFrameUrl.trim(), formSnapshot.endFrameUrl.trim()].filter(Boolean)
-        : []
-      if (frameUrls.some((url) => !isHttpUrl(url))) {
-        setMessage('video-v3 的首帧和尾帧必须是公网 http/https URL')
-        setShowSettings(true)
-        return
-      }
-      if (frameUrls.length > 0 && referenceUrls.length > 0) {
-        setMessage('video-v3 的首帧或尾帧不能与参考图片同时使用，请移除其中一项')
+      if (!videoV3RatioPresets.includes(formSnapshot.ratio)) {
+        setMessage('原 video-v3 协议不支持该画幅')
         setShowSettings(true)
         return
       }
@@ -2683,9 +2616,7 @@ function VideoStudioApp() {
       }
       submittedPrompt = mentionCompilation.prompt
     } else if (useVideoResourceApi) {
-      const totalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoUrls.length + (
-        useVideoV3Api && formSnapshot.videoV3Protocol === 'qy' && (formSnapshot.startFrameUrl.trim() || formSnapshot.endFrameUrl.trim()) ? 1 : 0
-      )
+      const totalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoUrls.length
       if (submissionMode === 'image' && totalReferences === 0) {
         setMessage('参考素材模式至少需要上传一张图片、一个音频或一个视频')
         return
@@ -2781,15 +2712,9 @@ function VideoStudioApp() {
             images: referenceUrls,
             videos: referenceVideoUrls,
             audios: referenceAudioUrls,
-            generateAudio: formSnapshot.generateAudio,
-            protocol: formSnapshot.videoV3Protocol,
-            resolution: formSnapshot.resolution === '720p' ? '720p' : '480p',
-            size: formSnapshot.videoV3Size,
-            startFrameUrl: formSnapshot.startFrameUrl,
-            endFrameUrl: formSnapshot.endFrameUrl,
-            seed: formSnapshot.seed,
-            bypassFaceCheck: formSnapshot.bypassFaceCheck,
-            gridStrength: formSnapshot.gridStrength,
+            generateAudio: true,
+            protocol: 'legacy',
+            resolution: VIDEO_V3_DEFAULT_RESOLUTION,
           })
       : useVideoV2Api
         ? buildVideoV2SubmitPayload({
@@ -2919,13 +2844,13 @@ function VideoStudioApp() {
           generate_audio: useVideoResourceApi ? formSnapshot.generateAudio : undefined,
           size: useMiniMaxApi ? formSnapshot.size : undefined,
           workflow_id: useMiniMaxApi ? resolvedMiniMaxWorkflowId : undefined,
-          video_v3_size: useVideoV3Api ? formSnapshot.videoV3Size.trim() || undefined : undefined,
-          start_frame_url: useVideoV3Api ? formSnapshot.startFrameUrl.trim() || undefined : undefined,
-          end_frame_url: useVideoV3Api ? formSnapshot.endFrameUrl.trim() || undefined : undefined,
-          video_v3_protocol: useVideoV3Api ? formSnapshot.videoV3Protocol : undefined,
-          seed: useVideoV3Api && formSnapshot.seed !== '' ? formSnapshot.seed : undefined,
-          bypass_face_check: useVideoV3Api ? formSnapshot.bypassFaceCheck : undefined,
-          grid_strength: useVideoV3Api && formSnapshot.gridStrength !== '' ? formSnapshot.gridStrength : undefined,
+          video_v3_size: undefined,
+          start_frame_url: undefined,
+          end_frame_url: undefined,
+          video_v3_protocol: useVideoV3Api ? 'legacy' : undefined,
+          seed: undefined,
+          bypass_face_check: undefined,
+          grid_strength: undefined,
           prompt: rawPrompt,
           submitted_prompt: submittedPrompt,
           reference_count: submissionMode === 'image' ? referenceUrls.length : 0,
@@ -3458,9 +3383,7 @@ function VideoStudioApp() {
                   {miniMaxModelSelected
                     ? 'MiniMax-H3 会按 images、reference_videos、reference_audios 字段提交；可点击每个素材旁的 @ 按钮，把 @参考图、@参考视频 或 @参考音频写入 Prompt。'
                     : videoV3ModelSelected
-                    ? form.videoV3Protocol === 'qy'
-                      ? 'QY 兼容协议会以顶层 prompt、images、videos、audios 外链数组提交；首尾帧 URL 不能与图片参考同时使用。'
-                      : '原 V3 协议保留 4-30 秒、原画幅与 720p；存在参考视频或音频时会按 content[] 中的 image_url、video_url、audio_url 提交。'
+                    ? 'video-v3 原协议保留 4-30 秒、原画幅与 720p；存在参考视频或音频时会按 content[] 中的 image_url、video_url、audio_url 提交。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
                 </div>
               </div>
@@ -3954,7 +3877,7 @@ function VideoStudioApp() {
                         }}
                         aria-label="video-v3 渲染时长"
                       />
-                      <span>秒（{VIDEO_V3_MIN_DURATION}-{form.videoV3Protocol === 'qy' ? VIDEO_V3_QY_MAX_DURATION : VIDEO_V3_MAX_DURATION}）</span>
+                      <span>秒（{VIDEO_V3_MIN_DURATION}-{VIDEO_V3_MAX_DURATION}）</span>
                     </label>
                   ) : (
                     <div className="segmented">
@@ -4039,129 +3962,8 @@ function VideoStudioApp() {
                 ) : videoV3ModelSelected ? (
                   <>
                     <div className="options-group">
-                      <span className="options-group-label"><Settings2 size={14} /> 请求协议</span>
-                      <div className="segmented">
-                        <button
-                          type="button"
-                          className={`segmented-item ${form.videoV3Protocol === 'legacy' ? 'is-active' : ''}`}
-                          onClick={() => changeVideoV3Protocol('legacy')}
-                        >
-                          原 V3 协议
-                        </button>
-                        <button
-                          type="button"
-                          className={`segmented-item ${form.videoV3Protocol === 'qy' ? 'is-active' : ''}`}
-                          onClick={() => changeVideoV3Protocol('qy')}
-                        >
-                          QY 兼容协议
-                        </button>
-                      </div>
-                    </div>
-                    <div className="options-group">
                       <span className="options-group-label"><Settings2 size={14} /> 输出清晰度</span>
-                      {form.videoV3Protocol === 'qy' ? (
-                        <div className="segmented">
-                          {VIDEO_V3_RESOLUTIONS.map((value) => (
-                            <button
-                              type="button"
-                              key={value}
-                              className={`segmented-item ${form.resolution === value ? 'is-active' : ''}`}
-                              onClick={() => updateField('resolution', value)}
-                            >
-                              {value}
-                            </button>
-                          ))}
-                        </div>
-                      ) : <span className="badge">固定 {VIDEO_V3_DEFAULT_RESOLUTION}</span>}
-                    </div>
-                    {form.videoV3Protocol === 'qy' && <>
-                    <div className="options-group video-v3-advanced-group">
-                      <label className="options-group-label" htmlFor="video-v3-size"><Settings2 size={14} /> 输出尺寸（可选）</label>
-                      <input
-                        id="video-v3-size"
-                        type="text"
-                        value={form.videoV3Size}
-                        onChange={(event) => updateField('videoV3Size', event.target.value)}
-                        placeholder="例如 1280x720"
-                      />
-                    </div>
-                    <div className="options-group video-v3-advanced-group">
-                      <label className="options-group-label" htmlFor="video-v3-start-frame"><Settings2 size={14} /> 首帧 URL（可选）</label>
-                      <input
-                        id="video-v3-start-frame"
-                        type="url"
-                        value={form.startFrameUrl}
-                        onChange={(event) => updateField('startFrameUrl', event.target.value)}
-                        placeholder="https://..."
-                      />
-                    </div>
-                    <div className="options-group video-v3-advanced-group">
-                      <label className="options-group-label" htmlFor="video-v3-end-frame"><Settings2 size={14} /> 尾帧 URL（可选）</label>
-                      <input
-                        id="video-v3-end-frame"
-                        type="url"
-                        value={form.endFrameUrl}
-                        onChange={(event) => updateField('endFrameUrl', event.target.value)}
-                        placeholder="https://..."
-                      />
-                      <span className="field-hint">首尾帧 URL 不能与参考图片同时使用，可与参考视频或音频组合。</span>
-                    </div>
-                    </>}
-                    <div className="options-group">
-                      <span className="options-group-label"><Settings2 size={14} /> 生成音频</span>
-                      <div className="segmented">
-                        <button
-                          type="button"
-                          className={`segmented-item ${form.generateAudio ? 'is-active' : ''}`}
-                          onClick={() => updateField('generateAudio', true)}
-                        >
-                          开启
-                        </button>
-                        <button
-                          type="button"
-                          className={`segmented-item ${!form.generateAudio ? 'is-active' : ''}`}
-                          onClick={() => updateField('generateAudio', false)}
-                        >
-                          关闭
-                        </button>
-                      </div>
-                    </div>
-                    <div className="options-group video-v3-advanced-group">
-                      <label className="options-group-label" htmlFor="video-v3-seed"><Settings2 size={14} /> 随机种子（可选）</label>
-                      <input
-                        id="video-v3-seed"
-                        type="number"
-                        step="1"
-                        inputMode="numeric"
-                        value={form.seed}
-                        onChange={(event) => updateField('seed', event.target.value === '' ? '' : Number(event.target.value))}
-                        placeholder="留空随机"
-                      />
-                    </div>
-                    <div className="options-group video-v3-advanced-group">
-                      <label className="options-group-label" htmlFor="video-v3-grid-strength"><Settings2 size={14} /> 素材融合强度（可选）</label>
-                      <input
-                        id="video-v3-grid-strength"
-                        type="number"
-                        min={form.videoV3Protocol === 'qy' ? '0.01' : '0'}
-                        max={form.videoV3Protocol === 'qy' ? '0.5' : '1'}
-                        step={form.videoV3Protocol === 'qy' ? '0.01' : '0.05'}
-                        inputMode="decimal"
-                        value={form.gridStrength}
-                        onChange={(event) => updateField('gridStrength', event.target.value === '' ? '' : Number(event.target.value))}
-                        placeholder={form.videoV3Protocol === 'qy' ? '0.01-0.5' : '0-1'}
-                      />
-                    </div>
-                    <div className="options-group video-v3-advanced-group">
-                      <label className="video-v3-toggle" htmlFor="video-v3-bypass-face-check">
-                        <input
-                          id="video-v3-bypass-face-check"
-                          type="checkbox"
-                          checked={form.bypassFaceCheck}
-                          onChange={(event) => updateField('bypassFaceCheck', event.target.checked)}
-                        />
-                        <span>透传 bypass_face_check</span>
-                      </label>
+                      <span className="badge">固定 {VIDEO_V3_DEFAULT_RESOLUTION}</span>
                     </div>
                   </>
                 ) : videoV2ModelSelected ? (
