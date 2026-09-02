@@ -18,13 +18,15 @@ export const VIDEO_V2_MODELS = [
   VIDEO_V2_FAST_MODEL,
   VIDEO_V2_LOW_PRICE_MODEL,
   VIDEO_V2_FAST_LOW_PRICE_MODEL,
-  VIDEO_V2_LOW_PRICE_LEGACY_MODEL,
-  VIDEO_V2_FAST_LOW_PRICE_LEGACY_MODEL,
 ] as const
 
 export const VIDEO_V2_LOW_PRICE_MODELS = [
   VIDEO_V2_LOW_PRICE_MODEL,
   VIDEO_V2_FAST_LOW_PRICE_MODEL,
+] as const
+
+const VIDEO_V2_ADAPTER_MODELS = [
+  ...VIDEO_V2_MODELS,
   VIDEO_V2_LOW_PRICE_LEGACY_MODEL,
   VIDEO_V2_FAST_LOW_PRICE_LEGACY_MODEL,
 ] as const
@@ -66,7 +68,7 @@ function getSafeCount(value: number) {
 
 export function isVideoV2Model(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
-  return VIDEO_V2_MODELS.some((candidate) => candidate === normalizedModel)
+  return VIDEO_V2_ADAPTER_MODELS.some((candidate) => candidate === normalizedModel)
 }
 
 export function isVideoV2FastModel(model: unknown) {

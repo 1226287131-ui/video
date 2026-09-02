@@ -1,8 +1,6 @@
 export const VIDEO_V3_MODELS = [
   'video-v3',
   'video-v3（限时低价渠道）',
-  // Keep the earlier duplicated-label spelling usable for already-issued model ids.
-  'video-v3（限时低价低价渠道）',
   'wan-3.0',
   'seedance-2.5',
   'seedance2.5',
@@ -12,8 +10,11 @@ export const VIDEO_V3_MODELS = [
 
 export const VIDEO_V3_LOW_PRICE_MODELS = [
   'video-v3（限时低价渠道）',
-  'video-v3（限时低价低价渠道）',
 ] as const
+
+// Keep the earlier duplicated-label spelling usable for already-issued history records.
+const VIDEO_V3_LOW_PRICE_LEGACY_MODEL = 'video-v3（限时低价低价渠道）' as const
+const VIDEO_V3_ADAPTER_MODELS = [...VIDEO_V3_MODELS, VIDEO_V3_LOW_PRICE_LEGACY_MODEL] as const
 
 export const VIDEO_V3_MEDIA_LIMITS = {
   images: 30,
@@ -48,7 +49,7 @@ export type VideoV3MediaCounts = typeof VIDEO_V3_MEDIA_LIMITS
 
 export function isVideoV3Model(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
-  return (VIDEO_V3_MODELS as readonly string[]).some((candidate) => candidate === normalizedModel)
+  return (VIDEO_V3_ADAPTER_MODELS as readonly string[]).some((candidate) => candidate === normalizedModel)
 }
 
 export function isValidVideoV3Duration(value: unknown): value is number {
