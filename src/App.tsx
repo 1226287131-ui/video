@@ -3398,7 +3398,7 @@ function VideoStudioApp() {
                   {miniMaxModelSelected
                     ? 'MiniMax-H3 会按 images、reference_videos、reference_audios 字段提交；可点击每个素材旁的 @ 按钮，把 @参考图、@参考视频 或 @参考音频写入 Prompt。'
                     : videoV3ModelSelected
-                    ? 'video-v3 原协议保留 4-30 秒、原画幅与 720p；存在参考视频或音频时会按 content[] 中的 image_url、video_url、audio_url 提交。'
+                    ? 'video-v3 原协议保留 4-30 秒、原画幅与 720p；wan-3.0 的参考素材会与顶层 prompt 一起按 images、videos、audios 数组提交。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
                 </div>
               </div>

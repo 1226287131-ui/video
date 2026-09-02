@@ -20,6 +20,7 @@ import {
   VIDEO_V3_RATIOS,
   VIDEO_V3_RESOLUTIONS,
   VIDEO_V3_RESOLUTION,
+  usesVideoV3TopLevelMedia,
 } from '../src/videoV3.ts'
 
 test('recognizes every documented SD2.5 model alias and routes it through /v1/videos', () => {
@@ -100,6 +101,25 @@ test('uses the same video-v3 adapter and payload contract for wan-3.0', () => {
   assert.equal(payload.ratio, '16:9')
   assert.equal(payload.resolution, '720p')
   assert.equal(payload.generate_audio, true)
+})
+
+test('uses top-level prompt and media arrays for wan-3.0 multimedia requests', () => {
+  const payload = buildVideoV3SubmitPayload({
+    model: 'WAN-3.0',
+    prompt: '让这个女生动起来，并保留参考音频。',
+    duration: 15,
+    ratio: '9:16',
+    images: ['https://cdn.example.com/person.png'],
+    videos: [],
+    audios: ['https://cdn.example.com/voice.mp3'],
+    generateAudio: true,
+  })
+
+  assert.equal(usesVideoV3TopLevelMedia('wan-3.0'), true)
+  assert.equal(payload.prompt, '让这个女生动起来，并保留参考音频。')
+  assert.deepEqual(payload.images, ['https://cdn.example.com/person.png'])
+  assert.deepEqual(payload.audios, ['https://cdn.example.com/voice.mp3'])
+  assert.equal('content' in payload, false)
 })
 
 test('uses QY top-level media arrays without changing the original wire contract', () => {

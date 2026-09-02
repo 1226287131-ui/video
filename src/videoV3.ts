@@ -52,6 +52,11 @@ export function isVideoV3Model(model: unknown) {
   return (VIDEO_V3_ADAPTER_MODELS as readonly string[]).some((candidate) => candidate === normalizedModel)
 }
 
+/** The wan-3.0 gateway validates prompt as a top-level field for multimedia requests. */
+export function usesVideoV3TopLevelMedia(model: unknown) {
+  return String(model || '').trim().toLowerCase() === 'wan-3.0'
+}
+
 export function isValidVideoV3Duration(value: unknown): value is number {
   const duration = typeof value === 'number'
     ? value

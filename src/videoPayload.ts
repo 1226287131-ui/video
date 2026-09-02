@@ -24,6 +24,7 @@ import {
   isValidVideoV3RatioForProtocol,
   isValidVideoV3ResolutionForProtocol,
   isVideoV3Model,
+  usesVideoV3TopLevelMedia,
   VIDEO_V3_MEDIA_LIMITS,
   VIDEO_V3_DEFAULT_RESOLUTION,
   VIDEO_V3_QY_DEFAULT_RESOLUTION,
@@ -302,7 +303,7 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
   if (input.bypassFaceCheck !== undefined) payloadBase.bypass_face_check = input.bypassFaceCheck
   if (input.gridStrength !== undefined && input.gridStrength !== '') payloadBase.grid_strength = input.gridStrength
 
-  if (protocol === 'legacy' && (videos.length > 0 || audios.length > 0)) {
+  if (protocol === 'legacy' && !usesVideoV3TopLevelMedia(input.model) && (videos.length > 0 || audios.length > 0)) {
     const content: VideoV3ContentItem[] = [
       { type: 'text', text: input.prompt },
       ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
