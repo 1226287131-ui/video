@@ -7,6 +7,7 @@ import {
   getVideoTaskPath,
   isVideoV2FastModel,
   isVideoV2Model,
+  isValidVideoV2Duration,
 } from '../src/videoApi.ts'
 import { buildVideoV2SubmitPayload } from '../src/videoPayload.ts'
 import {
@@ -30,6 +31,11 @@ test('identifies video-v2-fast as the fast adapter alias without broadening the 
   assert.equal(isVideoV2FastModel(' VIDEO-V2-FAST '), true)
   assert.equal(isVideoV2FastModel('video-v2'), false)
   assert.equal(isVideoV2FastModel('video-v2-fast-720'), false)
+})
+
+test('accepts every integer duration from 5 through 15 for both V2 channels', () => {
+  for (const duration of [5, 7, 12, 15, '10']) assert.equal(isValidVideoV2Duration(duration), true)
+  for (const duration of [4, 16, 7.5, '', 'abc']) assert.equal(isValidVideoV2Duration(duration), false)
 })
 
 test('routes video-v2 resources through /v1/videos while legacy routing is unchanged', () => {
@@ -108,6 +114,22 @@ test('includes fresh empty media arrays for text-only video-v2 requests', () => 
   assert.notEqual(payload.images, empty)
   assert.notEqual(payload.videos, empty)
   assert.notEqual(payload.audios, empty)
+})
+
+test('rejects V2 durations outside the configured 5-15 second range', () => {
+  const shared = {
+    model: 'video-v2',
+    prompt: 'city skyline at dusk',
+    images: [],
+    videos: [],
+    audios: [],
+    aspectRatio: '16:9',
+    resolution: '720p',
+    generateAudio: true,
+  }
+  assert.throws(() => buildVideoV2SubmitPayload({ ...shared, duration: 4 }), /5 到 15/)
+  assert.throws(() => buildVideoV2SubmitPayload({ ...shared, duration: 16 }), /5 到 15/)
+  assert.throws(() => buildVideoV2SubmitPayload({ ...shared, duration: 7.5 }), /5 到 15/)
 })
 
 test('rejects models without an internal video-v2 request configuration', () => {

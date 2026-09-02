@@ -4,8 +4,11 @@ import { isMiniMaxH3VideoModel } from './minimaxH3.ts'
 
 export {
   isVideoV2FastModel,
+  isValidVideoV2Duration,
   isVideoV2Model,
+  VIDEO_V2_MAX_DURATION,
   VIDEO_V2_FAST_MODEL,
+  VIDEO_V2_MIN_DURATION,
   VIDEO_V2_MODEL,
   VIDEO_V2_MODELS,
 } from './v2Media.ts'

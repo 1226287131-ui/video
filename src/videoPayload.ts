@@ -1,4 +1,4 @@
-import { isVideoV2Model } from './v2Media.ts'
+import { isValidVideoV2Duration, isVideoV2Model } from './v2Media.ts'
 import {
   isMiniMaxH3VideoModel,
   isValidMiniMaxH3AspectRatio,
@@ -496,6 +496,9 @@ export function buildMiniMaxH3SubmitPayload(input: MiniMaxH3SubmitPayloadInput) 
 export function buildVideoV2SubmitPayload(input: VideoV2SubmitPayloadInput) {
   if (!isVideoV2Model(input.model)) {
     throw new Error('video-v2 视频表单只能用于 video-v2 或 video-v2-fast')
+  }
+  if (!isValidVideoV2Duration(input.duration)) {
+    throw new Error('video-v2 系列的 duration 必须是 5 到 15 之间的整数')
   }
   const mediaPayload = {
     model: input.model,

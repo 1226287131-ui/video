@@ -12,6 +12,10 @@ export const VIDEO_V2_MODELS = [
   VIDEO_V2_FAST_MODEL,
 ] as const
 
+/** Both low-price V2 channels accept an integer duration from 5 to 15 seconds. */
+export const VIDEO_V2_MIN_DURATION = 5
+export const VIDEO_V2_MAX_DURATION = 15
+
 export type VideoV2MediaCounts = {
   images: number
   videos: number
@@ -50,6 +54,15 @@ export function isVideoV2Model(model: unknown) {
 
 export function isVideoV2FastModel(model: unknown) {
   return String(model || '').trim().toLowerCase() === VIDEO_V2_FAST_MODEL
+}
+
+export function isValidVideoV2Duration(value: unknown): value is number {
+  const duration = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value.trim())
+      : NaN
+  return Number.isInteger(duration) && duration >= VIDEO_V2_MIN_DURATION && duration <= VIDEO_V2_MAX_DURATION
 }
 
 function analyzeVideoV2Mentions(prompt: string, counts: VideoV2MediaCounts): VideoV2MentionResult {

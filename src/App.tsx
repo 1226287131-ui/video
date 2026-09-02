@@ -109,8 +109,11 @@ import {
 } from './videoV3'
 import {
   isVideoV2Model,
+  isValidVideoV2Duration,
+  VIDEO_V2_MAX_DURATION,
   normalizeVideoV2Mentions,
   VIDEO_V2_MEDIA_LIMITS,
+  VIDEO_V2_MIN_DURATION,
 } from './v2Media'
 import {
   decodePromptFile,
@@ -1171,7 +1174,7 @@ function VideoStudioApp() {
       setForm((current) => ({
         ...current,
         model: nextModel,
-        duration: VIDEO_V3_MIN_DURATION,
+        duration: isValidVideoV3DurationForProtocol(current.duration, 'legacy') ? current.duration : VIDEO_V3_MIN_DURATION,
         ratio: '16:9',
         quality: 'hd',
         resolution: VIDEO_V3_DEFAULT_RESOLUTION,
@@ -1195,7 +1198,9 @@ function VideoStudioApp() {
       setForm((current) => ({
         ...current,
         model: nextModel,
-        duration: durationPresets.includes(current.duration) ? current.duration : 5,
+        duration: nextModelUsesVideoV2
+          ? (isValidVideoV2Duration(current.duration) ? current.duration : VIDEO_V2_MIN_DURATION)
+          : (durationPresets.includes(current.duration) ? current.duration : 5),
         ratio: nextModelUsesVideoV2
           ? (isVideoV2Model(current.model) && videoV2RatioPresets.includes(current.ratio) ? current.ratio : '21:9')
           : (ratioPresets.includes(current.ratio) ? current.ratio : '16:9'),
@@ -1210,7 +1215,7 @@ function VideoStudioApp() {
       if (nextModelUsesVideoV2) {
         setImageSourceMode('upload')
         setImageInputMode('multiple')
-        setMessage(`${nextModel} 使用 /v1/videos：可纯文本生成，也可上传 ${VIDEO_V2_MEDIA_LIMITS.images} 图、${VIDEO_V2_MEDIA_LIMITS.audios} 音频、${VIDEO_V2_MEDIA_LIMITS.videos} 视频作为参考素材`)
+        setMessage(`${nextModel} 使用 /v1/videos：支持自定义 ${VIDEO_V2_MIN_DURATION}-${VIDEO_V2_MAX_DURATION} 秒，可纯文本生成，也可上传 ${VIDEO_V2_MEDIA_LIMITS.images} 图、${VIDEO_V2_MEDIA_LIMITS.audios} 音频、${VIDEO_V2_MEDIA_LIMITS.videos} 视频作为参考素材`)
       }
       return
     }
@@ -2588,6 +2593,12 @@ function VideoStudioApp() {
       }
     }
 
+    if (useVideoV2Api && !isValidVideoV2Duration(formSnapshot.duration)) {
+      setMessage(`${formSnapshot.model} 的时长必须是 ${VIDEO_V2_MIN_DURATION} 到 ${VIDEO_V2_MAX_DURATION} 秒之间的整数`)
+      setShowSettings(true)
+      return
+    }
+
     if (useMiniMaxApi) {
       const miniMaxTotalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoUrls.length
       if (submissionMode === 'image' && miniMaxTotalReferences === 0) {
@@ -3862,12 +3873,12 @@ function VideoStudioApp() {
                         ))}
                       </div>
                     </div>
-                  ) : videoV3ModelSelected ? (
+                  ) : videoV3ModelSelected || videoV2ModelSelected ? (
                     <label className="video-v3-number-control">
                       <input
                         type="number"
-                        min={VIDEO_V3_MIN_DURATION}
-                        max={VIDEO_V3_MAX_DURATION}
+                        min={videoV3ModelSelected ? VIDEO_V3_MIN_DURATION : VIDEO_V2_MIN_DURATION}
+                        max={videoV3ModelSelected ? VIDEO_V3_MAX_DURATION : VIDEO_V2_MAX_DURATION}
                         step="1"
                         inputMode="numeric"
                         value={form.duration}
@@ -3875,9 +3886,9 @@ function VideoStudioApp() {
                           const nextDuration = Number(event.target.value)
                           if (Number.isFinite(nextDuration)) updateField('duration', Math.trunc(nextDuration))
                         }}
-                        aria-label="video-v3 渲染时长"
+                        aria-label={`${form.model} 渲染时长`}
                       />
-                      <span>秒（{VIDEO_V3_MIN_DURATION}-{VIDEO_V3_MAX_DURATION}）</span>
+                      <span>秒（{videoV3ModelSelected ? VIDEO_V3_MIN_DURATION : VIDEO_V2_MIN_DURATION}-{videoV3ModelSelected ? VIDEO_V3_MAX_DURATION : VIDEO_V2_MAX_DURATION}）</span>
                     </label>
                   ) : (
                     <div className="segmented">
