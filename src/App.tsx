@@ -122,7 +122,7 @@ import {
   MAX_PROMPT_FILE_BYTES,
   mergeImportedPrompt,
 } from './promptFileImport'
-import { getMissingVideoV2ModelIds, getReplacementModelId } from './modelSelection'
+import { getMissingVideoV2ModelIds, getMissingVideoV3LowPriceModelIds, getReplacementModelId } from './modelSelection'
 
 type VideoDuration = number
 type VideoRatio = 'auto' | '21:9' | '16:9' | '9:16' | '1:1' | '4:3' | '3:4' | '2:3' | '3:2'
@@ -319,8 +319,6 @@ const MAX_POLL_ERRORS = 12
 const MAX_RESULT_WAIT_POLLS = 30
 const BATCH_DOWNLOAD_DELAY_MS = 250
 const VIDEO_PROXY_HOST_SUFFIXES = ['.douyin.com', '.douyinvod.com', '.byteimg.com', '.ibytedtos.com']
-const VIDEO_V2_15MB_IMAGE_MODELS = new Set(['video-v2', 'video-v2-fast'])
-
 function getVideoV2ImageSizeLimit(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
   if (isMiniMaxH3VideoModel(normalizedModel)) {
@@ -329,7 +327,7 @@ function getVideoV2ImageSizeLimit(model: unknown) {
   if (isVideoV3Model(normalizedModel)) {
     return { maxMegabytes: MAX_VIDEO_V3_IMAGE_MB, maxBytes: MAX_VIDEO_V3_IMAGE_BYTES }
   }
-  return VIDEO_V2_15MB_IMAGE_MODELS.has(normalizedModel)
+  return isVideoV2Model(normalizedModel)
     ? { maxMegabytes: MAX_VIDEO_V2_IMAGE_MB, maxBytes: MAX_VIDEO_V2_IMAGE_BYTES }
     : { maxMegabytes: MAX_REFERENCE_FILE_MB, maxBytes: MAX_REFERENCE_FILE_BYTES }
 }
@@ -943,6 +941,12 @@ function VideoStudioApp() {
             object: 'model',
             created: 0,
             owned_by: 'video-v2-adapter',
+          })),
+          ...getMissingVideoV3LowPriceModelIds(targetModels).map((id) => ({
+            id,
+            object: 'model',
+            created: 0,
+            owned_by: 'video-v3-adapter',
           })),
         ]
 

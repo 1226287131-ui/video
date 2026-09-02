@@ -7,9 +7,26 @@ export const VIDEO_V2_MEDIA_LIMITS = {
 /** Canonical model ids handled by the shared Video V2 adapter. */
 export const VIDEO_V2_MODEL = 'video-v2' as const
 export const VIDEO_V2_FAST_MODEL = 'video-v2-fast' as const
+/** Additional low-price channel ids backed by the same V2 adapters. */
+export const VIDEO_V2_LOW_PRICE_MODEL = 'video-v2（限时低价渠道）' as const
+export const VIDEO_V2_FAST_LOW_PRICE_MODEL = 'video-v2-fast（限时低价渠道）' as const
+// Keep the earlier duplicated-label spelling usable for already-issued model ids.
+const VIDEO_V2_LOW_PRICE_LEGACY_MODEL = 'video-v2（限时低价低价渠道）' as const
+const VIDEO_V2_FAST_LOW_PRICE_LEGACY_MODEL = 'video-v2-fast（限时低价低价渠道）' as const
 export const VIDEO_V2_MODELS = [
   VIDEO_V2_MODEL,
   VIDEO_V2_FAST_MODEL,
+  VIDEO_V2_LOW_PRICE_MODEL,
+  VIDEO_V2_FAST_LOW_PRICE_MODEL,
+  VIDEO_V2_LOW_PRICE_LEGACY_MODEL,
+  VIDEO_V2_FAST_LOW_PRICE_LEGACY_MODEL,
+] as const
+
+export const VIDEO_V2_LOW_PRICE_MODELS = [
+  VIDEO_V2_LOW_PRICE_MODEL,
+  VIDEO_V2_FAST_LOW_PRICE_MODEL,
+  VIDEO_V2_LOW_PRICE_LEGACY_MODEL,
+  VIDEO_V2_FAST_LOW_PRICE_LEGACY_MODEL,
 ] as const
 
 /** Both low-price V2 channels accept an integer duration from 5 to 15 seconds. */
@@ -53,7 +70,10 @@ export function isVideoV2Model(model: unknown) {
 }
 
 export function isVideoV2FastModel(model: unknown) {
-  return String(model || '').trim().toLowerCase() === VIDEO_V2_FAST_MODEL
+  const normalizedModel = String(model || '').trim().toLowerCase()
+  return normalizedModel === VIDEO_V2_FAST_MODEL
+    || normalizedModel === VIDEO_V2_FAST_LOW_PRICE_MODEL
+    || normalizedModel === VIDEO_V2_FAST_LOW_PRICE_LEGACY_MODEL
 }
 
 export function isValidVideoV2Duration(value: unknown): value is number {

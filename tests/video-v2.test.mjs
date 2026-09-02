@@ -16,8 +16,9 @@ import {
 } from '../src/v2Media.ts'
 
 test('recognizes supported video-v2 models without case sensitivity', () => {
-  assert.equal(isVideoV2Model('video-v2'), true)
-  assert.equal(isVideoV2Model(' VIDEO-V2-FAST '), true)
+  for (const model of ['video-v2', ' VIDEO-V2-FAST ', 'video-v2（限时低价渠道）', 'video-v2-fast（限时低价渠道）', 'video-v2-fast（限时低价低价渠道）']) {
+    assert.equal(isVideoV2Model(model), true)
+  }
   assert.equal(isVideoV2Model(' Video-V2-Mini '), false)
   assert.equal(isVideoV2Model(' video-v2-满血兜底版 '), false)
   assert.equal(isVideoV2Model('video-v2-fast-720'), false)
@@ -29,6 +30,8 @@ test('recognizes supported video-v2 models without case sensitivity', () => {
 test('identifies video-v2-fast as the fast adapter alias without broadening the match', () => {
   assert.equal(isVideoV2FastModel('video-v2-fast'), true)
   assert.equal(isVideoV2FastModel(' VIDEO-V2-FAST '), true)
+  assert.equal(isVideoV2FastModel('video-v2-fast（限时低价渠道）'), true)
+  assert.equal(isVideoV2FastModel('video-v2-fast（限时低价低价渠道）'), true)
   assert.equal(isVideoV2FastModel('video-v2'), false)
   assert.equal(isVideoV2FastModel('video-v2-fast-720'), false)
 })

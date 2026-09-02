@@ -1,10 +1,18 @@
 export const VIDEO_V3_MODELS = [
   'video-v3',
+  'video-v3（限时低价渠道）',
+  // Keep the earlier duplicated-label spelling usable for already-issued model ids.
+  'video-v3（限时低价低价渠道）',
   'wan-3.0',
   'seedance-2.5',
   'seedance2.5',
   'sd-2.5',
   'sd2.5',
+] as const
+
+export const VIDEO_V3_LOW_PRICE_MODELS = [
+  'video-v3（限时低价渠道）',
+  'video-v3（限时低价低价渠道）',
 ] as const
 
 export const VIDEO_V3_MEDIA_LIMITS = {

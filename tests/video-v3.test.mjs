@@ -23,7 +23,7 @@ import {
 } from '../src/videoV3.ts'
 
 test('recognizes every documented SD2.5 model alias and routes it through /v1/videos', () => {
-  for (const model of ['video-v3', 'WAN-3.0', 'Seedance-2.5', 'seedance2.5', 'SD-2.5', ' sd2.5 ']) {
+  for (const model of ['video-v3', 'video-v3（限时低价渠道）', 'video-v3（限时低价低价渠道）', 'WAN-3.0', 'Seedance-2.5', 'seedance2.5', 'SD-2.5', ' sd2.5 ']) {
     assert.equal(isVideoV3Model(model), true)
     assert.equal(getVideoSubmitPath(model), '/v1/videos')
     assert.equal(getVideoTaskPath(model, 'task/a'), '/v1/videos/task%2Fa')
