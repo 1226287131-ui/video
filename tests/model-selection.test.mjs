@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getMissingVideoV2ModelIds, getMissingVideoV3Fixed480pModelIds, getMissingVideoV3LowPriceModelIds, getReplacementModelId } from '../src/modelSelection.ts'
+import { getMissingVideoV2ModelIds, getMissingVideoV3Fixed480pModelIds, getMissingVideoV3LowPriceModelIds, getMissingVideoV3SpecialPriceModelIds, getReplacementModelId } from '../src/modelSelection.ts'
 
 test('uses the first available model when the stored model has been taken offline', () => {
   const replacement = getReplacementModelId('video-v1', [
@@ -55,4 +55,11 @@ test('keeps the fixed 480p V3 adapter selectable when the gateway omits it', () 
     'video-v3-480p',
   ])
   assert.deepEqual(getMissingVideoV3Fixed480pModelIds([{ id: 'VIDEO-V3-480P' }]), [])
+})
+
+test('keeps the special-price V3 adapter selectable when the gateway omits it', () => {
+  assert.deepEqual(getMissingVideoV3SpecialPriceModelIds([{ id: 'video-v3' }]), [
+    'video-v3-特价版',
+  ])
+  assert.deepEqual(getMissingVideoV3SpecialPriceModelIds([{ id: 'VIDEO-V3-特价版' }]), [])
 })

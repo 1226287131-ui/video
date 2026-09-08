@@ -1,6 +1,7 @@
 export const VIDEO_V3_MODELS = [
   'video-v3',
   'video-v3-480p',
+  'video-v3-特价版',
   'video-v3（限时低价渠道）',
   'wan-3.0',
   'seedance-2.5',
@@ -11,6 +12,10 @@ export const VIDEO_V3_MODELS = [
 
 export const VIDEO_V3_FIXED_480P_MODELS = [
   'video-v3-480p',
+] as const
+
+export const VIDEO_V3_SPECIAL_PRICE_MODELS = [
+  'video-v3-特价版',
 ] as const
 
 export const VIDEO_V3_LOW_PRICE_MODELS = [
@@ -50,7 +55,11 @@ export const VIDEO_V3_QY_RATIOS = ['16:9', '1:1', '9:16'] as const
 export type VideoV3Ratio = typeof VIDEO_V3_RATIOS[number]
 export type VideoV3Resolution = typeof VIDEO_V3_RESOLUTIONS[number]
 export type VideoV3Protocol = 'legacy' | 'qy'
-export type VideoV3MediaCounts = typeof VIDEO_V3_MEDIA_LIMITS
+export type VideoV3MediaCounts = {
+  readonly images: number
+  readonly videos: number
+  readonly audios: number
+}
 
 export function isVideoV3Model(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
@@ -60,6 +69,11 @@ export function isVideoV3Model(model: unknown) {
 export function isVideoV3Fixed480pModel(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
   return (VIDEO_V3_FIXED_480P_MODELS as readonly string[]).some((candidate) => candidate === normalizedModel)
+}
+
+export function isVideoV3SpecialPriceModel(model: unknown) {
+  const normalizedModel = String(model || '').trim().toLowerCase()
+  return (VIDEO_V3_SPECIAL_PRICE_MODELS as readonly string[]).some((candidate) => candidate === normalizedModel)
 }
 
 export function getVideoV3DefaultResolution(model: unknown, protocol: VideoV3Protocol = 'legacy'): VideoV3Resolution {
@@ -127,5 +141,12 @@ export function isValidVideoV3GridStrengthForProtocol(value: unknown, protocol: 
 }
 
 export function getVideoV3MediaLimits() {
+  return VIDEO_V3_MEDIA_LIMITS
+}
+
+export function getVideoV3MediaLimitsForModel(model: unknown): VideoV3MediaCounts {
+  if (isVideoV3SpecialPriceModel(model)) {
+    return { images: 9, videos: 0, audios: 0 }
+  }
   return VIDEO_V3_MEDIA_LIMITS
 }

@@ -24,10 +24,11 @@ import {
   isValidVideoV3RatioForProtocol,
   isValidVideoV3ResolutionForModel,
   getVideoV3DefaultResolution,
+  getVideoV3MediaLimitsForModel,
   isVideoV3Fixed480pModel,
+  isVideoV3SpecialPriceModel,
   isVideoV3Model,
   usesVideoV3TopLevelMedia,
-  VIDEO_V3_MEDIA_LIMITS,
   type VideoV3Protocol,
   type VideoV3Resolution,
   type VideoV3Ratio,
@@ -271,9 +272,16 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
   const startFrameUrl = normalizeOptionalUrl(input.startFrameUrl, 'start_frame_url')
   const endFrameUrl = normalizeOptionalUrl(input.endFrameUrl, 'end_frame_url')
 
-  const images = normalizeUrls(input.images, '图片参考', VIDEO_V3_MEDIA_LIMITS.images)
-  const videos = normalizeUrls(input.videos, '视频参考', VIDEO_V3_MEDIA_LIMITS.videos)
-  const audios = normalizeUrls(input.audios, '音频参考', VIDEO_V3_MEDIA_LIMITS.audios)
+  const mediaLimits = getVideoV3MediaLimitsForModel(input.model)
+  if (isVideoV3SpecialPriceModel(input.model) && input.videos.length > 0) {
+    throw new Error('video-v3-特价版不支持参考视频')
+  }
+  if (isVideoV3SpecialPriceModel(input.model) && input.audios.length > 0) {
+    throw new Error('video-v3-特价版不支持参考音频')
+  }
+  const images = normalizeUrls(input.images, '图片参考', mediaLimits.images)
+  const videos = normalizeUrls(input.videos, '视频参考', mediaLimits.videos)
+  const audios = normalizeUrls(input.audios, '音频参考', mediaLimits.audios)
 
   if (input.seed !== undefined && input.seed !== '') {
     const seedIsValid = protocol === 'qy'

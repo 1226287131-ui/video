@@ -21,13 +21,15 @@ import {
   VIDEO_V3_RESOLUTIONS,
   VIDEO_V3_RESOLUTION,
   getVideoV3DefaultResolution,
+  getVideoV3MediaLimitsForModel,
   isVideoV3Fixed480pModel,
+  isVideoV3SpecialPriceModel,
   isValidVideoV3ResolutionForModel,
   usesVideoV3TopLevelMedia,
 } from '../src/videoV3.ts'
 
 test('recognizes every documented SD2.5 model alias and routes it through /v1/videos', () => {
-  for (const model of ['video-v3', 'video-v3-480p', 'video-v3（限时低价渠道）', 'video-v3（限时低价低价渠道）', 'WAN-3.0', 'Seedance-2.5', 'seedance2.5', 'SD-2.5', ' sd2.5 ']) {
+  for (const model of ['video-v3', 'video-v3-480p', 'video-v3-特价版', 'video-v3（限时低价渠道）', 'video-v3（限时低价低价渠道）', 'WAN-3.0', 'Seedance-2.5', 'seedance2.5', 'SD-2.5', ' sd2.5 ']) {
     assert.equal(isVideoV3Model(model), true)
     assert.equal(getVideoSubmitPath(model), '/v1/videos')
     assert.equal(getVideoTaskPath(model, 'task/a'), '/v1/videos/task%2Fa')
@@ -44,6 +46,53 @@ test('keeps video-v3-480p on the shared adapter while enforcing 480p', () => {
   assert.equal(isValidVideoV3ResolutionForModel('480p', 'video-v3-480p', 'legacy'), true)
   assert.equal(isValidVideoV3ResolutionForModel('720p', 'video-v3-480p', 'legacy'), false)
   assert.equal(isValidVideoV3ResolutionForModel('720p', 'video-v3', 'legacy'), true)
+})
+
+test('limits video-v3-特价版 to nine images and disallows video/audio references', () => {
+  assert.equal(isVideoV3SpecialPriceModel('VIDEO-V3-特价版'), true)
+  assert.deepEqual(getVideoV3MediaLimitsForModel('video-v3-特价版'), { images: 9, videos: 0, audios: 0 })
+
+  const payload = buildVideoV3SubmitPayload({
+    model: 'video-v3-特价版',
+    prompt: '仅使用参考图片。',
+    duration: 10,
+    ratio: '16:9',
+    images: Array.from({ length: 9 }, (_, index) => `https://cdn.example.com/person-${index}.png`),
+    videos: [],
+    audios: [],
+    generateAudio: true,
+  })
+  assert.deepEqual(payload.images, Array.from({ length: 9 }, (_, index) => `https://cdn.example.com/person-${index}.png`))
+  assert.throws(() => buildVideoV3SubmitPayload({
+    model: 'video-v3-特价版',
+    prompt: '超过图片上限。',
+    duration: 10,
+    ratio: '16:9',
+    images: Array.from({ length: 10 }, (_, index) => `https://cdn.example.com/person-${index}.png`),
+    videos: [],
+    audios: [],
+    generateAudio: true,
+  }), /最多支持 9/)
+  assert.throws(() => buildVideoV3SubmitPayload({
+    model: 'video-v3-特价版',
+    prompt: '不支持参考视频。',
+    duration: 10,
+    ratio: '16:9',
+    images: [],
+    videos: ['https://cdn.example.com/camera.mp4'],
+    audios: [],
+    generateAudio: true,
+  }), /不支持参考视频/)
+  assert.throws(() => buildVideoV3SubmitPayload({
+    model: 'video-v3-特价版',
+    prompt: '不支持参考音频。',
+    duration: 10,
+    ratio: '16:9',
+    images: [],
+    videos: [],
+    audios: ['https://cdn.example.com/voice.mp3'],
+    generateAudio: true,
+  }), /不支持参考音频/)
 })
 
 test('keeps the original SD2.5 values while validating the QY subset separately', () => {
