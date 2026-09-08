@@ -22,12 +22,12 @@ import {
   isValidVideoV3DurationForProtocol,
   isValidVideoV3GridStrengthForProtocol,
   isValidVideoV3RatioForProtocol,
-  isValidVideoV3ResolutionForProtocol,
+  isValidVideoV3ResolutionForModel,
+  getVideoV3DefaultResolution,
+  isVideoV3Fixed480pModel,
   isVideoV3Model,
   usesVideoV3TopLevelMedia,
   VIDEO_V3_MEDIA_LIMITS,
-  VIDEO_V3_DEFAULT_RESOLUTION,
-  VIDEO_V3_QY_DEFAULT_RESOLUTION,
   type VideoV3Protocol,
   type VideoV3Resolution,
   type VideoV3Ratio,
@@ -241,11 +241,13 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
   }
   if (typeof input.generateAudio !== 'boolean') throw new Error('video-v3 的 generate_audio 必须是布尔值')
 
-  const resolution = input.resolution ?? (protocol === 'qy' ? VIDEO_V3_QY_DEFAULT_RESOLUTION : VIDEO_V3_DEFAULT_RESOLUTION)
-  if (!isValidVideoV3ResolutionForProtocol(resolution, protocol)) {
+  const resolution = input.resolution ?? getVideoV3DefaultResolution(input.model, protocol)
+  if (!isValidVideoV3ResolutionForModel(resolution, input.model, protocol)) {
     throw new Error(protocol === 'qy'
       ? 'QY 协议的 resolution 仅支持 480p 或 720p'
-      : '原协议的 resolution 固定为 720p')
+      : isVideoV3Fixed480pModel(input.model)
+        ? 'video-v3-480p 的 resolution 固定为 480p'
+        : '原协议的 resolution 固定为 720p')
   }
 
   const normalizeOptionalUrl = (value: unknown, label: string) => {

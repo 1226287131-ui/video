@@ -20,11 +20,14 @@ import {
   VIDEO_V3_RATIOS,
   VIDEO_V3_RESOLUTIONS,
   VIDEO_V3_RESOLUTION,
+  getVideoV3DefaultResolution,
+  isVideoV3Fixed480pModel,
+  isValidVideoV3ResolutionForModel,
   usesVideoV3TopLevelMedia,
 } from '../src/videoV3.ts'
 
 test('recognizes every documented SD2.5 model alias and routes it through /v1/videos', () => {
-  for (const model of ['video-v3', 'video-v3（限时低价渠道）', 'video-v3（限时低价低价渠道）', 'WAN-3.0', 'Seedance-2.5', 'seedance2.5', 'SD-2.5', ' sd2.5 ']) {
+  for (const model of ['video-v3', 'video-v3-480p', 'video-v3（限时低价渠道）', 'video-v3（限时低价低价渠道）', 'WAN-3.0', 'Seedance-2.5', 'seedance2.5', 'SD-2.5', ' sd2.5 ']) {
     assert.equal(isVideoV3Model(model), true)
     assert.equal(getVideoSubmitPath(model), '/v1/videos')
     assert.equal(getVideoTaskPath(model, 'task/a'), '/v1/videos/task%2Fa')
@@ -32,6 +35,15 @@ test('recognizes every documented SD2.5 model alias and routes it through /v1/vi
   }
   assert.equal(isVideoV3Model('video-v3-fast'), false)
   assert.equal(isVideoV3Model('video-v2'), false)
+})
+
+test('keeps video-v3-480p on the shared adapter while enforcing 480p', () => {
+  assert.equal(isVideoV3Fixed480pModel('VIDEO-V3-480P'), true)
+  assert.equal(getVideoV3DefaultResolution('video-v3-480p', 'legacy'), '480p')
+  assert.equal(getVideoV3DefaultResolution('video-v3', 'legacy'), '720p')
+  assert.equal(isValidVideoV3ResolutionForModel('480p', 'video-v3-480p', 'legacy'), true)
+  assert.equal(isValidVideoV3ResolutionForModel('720p', 'video-v3-480p', 'legacy'), false)
+  assert.equal(isValidVideoV3ResolutionForModel('720p', 'video-v3', 'legacy'), true)
 })
 
 test('keeps the original SD2.5 values while validating the QY subset separately', () => {
@@ -101,6 +113,32 @@ test('uses the same video-v3 adapter and payload contract for wan-3.0', () => {
   assert.equal(payload.ratio, '16:9')
   assert.equal(payload.resolution, '720p')
   assert.equal(payload.generate_audio, true)
+})
+
+test('defaults video-v3-480p requests to 480p and rejects 720p', () => {
+  const payload = buildVideoV3SubmitPayload({
+    model: 'video-v3-480p',
+    prompt: '固定低清晰度输出。',
+    duration: 10,
+    ratio: '16:9',
+    images: [],
+    videos: [],
+    audios: [],
+    generateAudio: true,
+  })
+
+  assert.equal(payload.resolution, '480p')
+  assert.throws(() => buildVideoV3SubmitPayload({
+    model: 'video-v3-480p',
+    prompt: '不允许 720p。',
+    duration: 10,
+    ratio: '16:9',
+    images: [],
+    videos: [],
+    audios: [],
+    generateAudio: true,
+    resolution: '720p',
+  }), /固定为 480p/)
 })
 
 test('uses top-level prompt and media arrays for wan-3.0 multimedia requests', () => {

@@ -1,11 +1,16 @@
 export const VIDEO_V3_MODELS = [
   'video-v3',
+  'video-v3-480p',
   'video-v3（限时低价渠道）',
   'wan-3.0',
   'seedance-2.5',
   'seedance2.5',
   'sd-2.5',
   'sd2.5',
+] as const
+
+export const VIDEO_V3_FIXED_480P_MODELS = [
+  'video-v3-480p',
 ] as const
 
 export const VIDEO_V3_LOW_PRICE_MODELS = [
@@ -52,6 +57,16 @@ export function isVideoV3Model(model: unknown) {
   return (VIDEO_V3_ADAPTER_MODELS as readonly string[]).some((candidate) => candidate === normalizedModel)
 }
 
+export function isVideoV3Fixed480pModel(model: unknown) {
+  const normalizedModel = String(model || '').trim().toLowerCase()
+  return (VIDEO_V3_FIXED_480P_MODELS as readonly string[]).some((candidate) => candidate === normalizedModel)
+}
+
+export function getVideoV3DefaultResolution(model: unknown, protocol: VideoV3Protocol = 'legacy'): VideoV3Resolution {
+  if (isVideoV3Fixed480pModel(model)) return '480p'
+  return protocol === 'qy' ? VIDEO_V3_QY_DEFAULT_RESOLUTION : VIDEO_V3_DEFAULT_RESOLUTION
+}
+
 /** The wan-3.0 gateway validates prompt as a top-level field for multimedia requests. */
 export function usesVideoV3TopLevelMedia(model: unknown) {
   return String(model || '').trim().toLowerCase() === 'wan-3.0'
@@ -94,6 +109,11 @@ export function isValidVideoV3ResolutionForProtocol(value: unknown, protocol: Vi
   return protocol === 'qy'
     ? isValidVideoV3Resolution(value)
     : value === VIDEO_V3_DEFAULT_RESOLUTION
+}
+
+export function isValidVideoV3ResolutionForModel(value: unknown, model: unknown, protocol: VideoV3Protocol) {
+  if (isVideoV3Fixed480pModel(model)) return value === '480p'
+  return isValidVideoV3ResolutionForProtocol(value, protocol)
 }
 
 export function isValidVideoV3GridStrength(value: unknown): value is number {

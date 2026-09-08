@@ -104,7 +104,8 @@ import {
   VIDEO_V3_MEDIA_LIMITS,
   VIDEO_V3_MIN_DURATION,
   VIDEO_V3_RATIOS,
-  VIDEO_V3_DEFAULT_RESOLUTION,
+  getVideoV3DefaultResolution,
+  isVideoV3Fixed480pModel,
   type VideoV3Protocol,
 } from './videoV3'
 import {
@@ -122,7 +123,7 @@ import {
   MAX_PROMPT_FILE_BYTES,
   mergeImportedPrompt,
 } from './promptFileImport'
-import { getMissingVideoV2ModelIds, getMissingVideoV3LowPriceModelIds, getReplacementModelId } from './modelSelection'
+import { getMissingVideoV2ModelIds, getMissingVideoV3Fixed480pModelIds, getMissingVideoV3LowPriceModelIds, getReplacementModelId } from './modelSelection'
 
 type VideoDuration = number
 type VideoRatio = 'auto' | '21:9' | '16:9' | '9:16' | '1:1' | '4:3' | '3:4' | '2:3' | '3:2'
@@ -878,7 +879,7 @@ function VideoStudioApp() {
         duration: parsed.seconds ?? parsed.duration ?? current.duration,
         ratio: parsed.ratio ?? current.ratio,
         quality: parsed.quality ?? current.quality,
-        resolution: parsed.resolution ?? current.resolution,
+        resolution: restoredVideoV3 ? getVideoV3DefaultResolution(parsed.model, 'legacy') : parsed.resolution ?? current.resolution,
         size: isMiniMaxH3SuperResolutionSize(parsed.workflow_size)
           ? parsed.workflow_size
           : parsed.size ?? current.size,
@@ -947,6 +948,12 @@ function VideoStudioApp() {
             object: 'model',
             created: 0,
             owned_by: 'video-v3-adapter',
+          })),
+          ...getMissingVideoV3Fixed480pModelIds(targetModels).map((id) => ({
+            id,
+            object: 'model',
+            created: 0,
+            owned_by: 'video-v3-480p-adapter',
           })),
         ]
 
@@ -1181,7 +1188,7 @@ function VideoStudioApp() {
         duration: isValidVideoV3DurationForProtocol(current.duration, 'legacy') ? current.duration : VIDEO_V3_MIN_DURATION,
         ratio: '16:9',
         quality: 'hd',
-        resolution: VIDEO_V3_DEFAULT_RESOLUTION,
+        resolution: getVideoV3DefaultResolution(nextModel, 'legacy'),
         generateAudio: true,
         videoV3Protocol: 'legacy',
         videoV3Size: '',
@@ -1193,7 +1200,7 @@ function VideoStudioApp() {
       }))
       setImageInputMode('multiple')
       setImageSourceMode('upload')
-      setMessage(`${nextModel} 使用 video-v3 原协议：4-30 秒、720p`)
+      setMessage(`${nextModel} 使用 video-v3 原协议：4-30 秒、${getVideoV3DefaultResolution(nextModel, 'legacy')}`)
       return
     }
 
@@ -2116,7 +2123,7 @@ function VideoStudioApp() {
           ? MINIMAX_H3_DEFAULT_ASPECT_RATIO
           : item.ratio ?? current.ratio,
         quality: item.quality ?? current.quality,
-        resolution: item.resolution ?? current.resolution,
+        resolution: historyUsesVideoV3 ? getVideoV3DefaultResolution(item.model, 'legacy') : item.resolution ?? current.resolution,
         size: historyUsesMiniMax
           ? (() => {
               const ratio = isValidMiniMaxH3AspectRatio(item.ratio)
@@ -2729,7 +2736,7 @@ function VideoStudioApp() {
             audios: referenceAudioUrls,
             generateAudio: true,
             protocol: 'legacy',
-            resolution: VIDEO_V3_DEFAULT_RESOLUTION,
+            resolution: getVideoV3DefaultResolution(formSnapshot.model, 'legacy'),
           })
       : useVideoV2Api
         ? buildVideoV2SubmitPayload({
@@ -2855,7 +2862,7 @@ function VideoStudioApp() {
           ratio: formSnapshot.ratio,
           aspect_ratio: submittedMiniMaxAspectRatio,
           quality: formSnapshot.quality,
-          resolution: useGrokApi ? formSnapshot.resolution : useVideoV3Api ? formSnapshot.resolution : useVideoV2Api ? formSnapshot.resolution : undefined,
+          resolution: useGrokApi ? formSnapshot.resolution : useVideoV3Api ? getVideoV3DefaultResolution(formSnapshot.model, 'legacy') : useVideoV2Api ? formSnapshot.resolution : undefined,
           generate_audio: useVideoResourceApi ? formSnapshot.generateAudio : undefined,
           size: useMiniMaxApi ? formSnapshot.size : undefined,
           workflow_id: useMiniMaxApi ? resolvedMiniMaxWorkflowId : undefined,
@@ -3398,7 +3405,7 @@ function VideoStudioApp() {
                   {miniMaxModelSelected
                     ? 'MiniMax-H3 会按 images、reference_videos、reference_audios 字段提交；可点击每个素材旁的 @ 按钮，把 @参考图、@参考视频 或 @参考音频写入 Prompt。'
                     : videoV3ModelSelected
-                    ? 'video-v3 原协议保留 4-30 秒、原画幅与 720p；wan-3.0 的参考素材会与顶层 prompt 一起按 images、videos、audios 数组提交。'
+                    ? `video-v3 原协议保留 4-30 秒和原画幅；${isVideoV3Fixed480pModel(form.model) ? 'video-v3-480p 固定 480p' : '其他 video-v3 模型固定 720p'}；wan-3.0 的参考素材会与顶层 prompt 一起按 images、videos、audios 数组提交。`
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
                 </div>
               </div>
@@ -3978,7 +3985,7 @@ function VideoStudioApp() {
                   <>
                     <div className="options-group">
                       <span className="options-group-label"><Settings2 size={14} /> 输出清晰度</span>
-                      <span className="badge">固定 {VIDEO_V3_DEFAULT_RESOLUTION}</span>
+                      <span className="badge">固定 {getVideoV3DefaultResolution(form.model, 'legacy')}</span>
                     </div>
                   </>
                 ) : videoV2ModelSelected ? (
