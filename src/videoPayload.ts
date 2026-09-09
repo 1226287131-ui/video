@@ -1,4 +1,4 @@
-import { isValidVideoV2Duration, isVideoV2Model } from './v2Media.ts'
+import { getVideoV2MediaLimitsForModel, isValidVideoV2Duration, isVideoV2Model, isVideoV2SpecialPriceModel } from './v2Media.ts'
 import {
   isMiniMaxH3VideoModel,
   isValidMiniMaxH3AspectRatio,
@@ -510,6 +510,20 @@ export function buildVideoV2SubmitPayload(input: VideoV2SubmitPayloadInput) {
   }
   if (!isValidVideoV2Duration(input.duration)) {
     throw new Error('video-v2 系列的 duration 必须是 5 到 15 之间的整数')
+  }
+  const mediaLimits = getVideoV2MediaLimitsForModel(input.model)
+  if (input.images.length > mediaLimits.images) {
+    throw new Error(`${input.model} 最多支持 ${mediaLimits.images} 张参考图`)
+  }
+  if (input.videos.length > mediaLimits.videos) {
+    throw new Error(isVideoV2SpecialPriceModel(input.model)
+      ? `${input.model} 不支持参考视频`
+      : `${input.model} 最多支持 ${mediaLimits.videos} 个参考视频`)
+  }
+  if (input.audios.length > mediaLimits.audios) {
+    throw new Error(isVideoV2SpecialPriceModel(input.model)
+      ? `${input.model} 不支持参考音频`
+      : `${input.model} 最多支持 ${mediaLimits.audios} 个参考音频`)
   }
   const mediaPayload = {
     model: input.model,

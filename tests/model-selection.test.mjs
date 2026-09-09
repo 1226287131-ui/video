@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getMissingVideoV2ModelIds, getMissingVideoV3Fixed480pModelIds, getMissingVideoV3LowPriceModelIds, getMissingVideoV3SpecialPriceModelIds, getReplacementModelId } from '../src/modelSelection.ts'
+import { getMissingVideoV2ModelIds, getMissingVideoV2SpecialPriceModelIds, getMissingVideoV3Fixed480pModelIds, getMissingVideoV3LowPriceModelIds, getMissingVideoV3SpecialPriceModelIds, getReplacementModelId } from '../src/modelSelection.ts'
 
 test('uses the first available model when the stored model has been taken offline', () => {
   const replacement = getReplacementModelId('video-v1', [
@@ -41,6 +41,13 @@ test('keeps both Video V2 aliases selectable when the gateway omits them', () =>
     { id: 'video-v2（限时低价渠道）' },
     { id: 'video-v2-fast（限时低价渠道）' },
   ]), [])
+})
+
+test('keeps the special-price V2 adapter selectable when the gateway omits it', () => {
+  assert.deepEqual(getMissingVideoV2SpecialPriceModelIds([{ id: 'video-v2' }]), [
+    'video-v2-特价版',
+  ])
+  assert.deepEqual(getMissingVideoV2SpecialPriceModelIds([{ id: 'VIDEO-V2-特价版' }]), [])
 })
 
 test('keeps low-price V3 channel aliases selectable when the gateway omits them', () => {

@@ -1,4 +1,4 @@
-import { VIDEO_V2_MODELS } from './v2Media.ts'
+import { VIDEO_V2_MODELS, VIDEO_V2_SPECIAL_PRICE_MODELS } from './v2Media.ts'
 import { VIDEO_V3_FIXED_480P_MODELS, VIDEO_V3_LOW_PRICE_MODELS, VIDEO_V3_SPECIAL_PRICE_MODELS } from './videoV3.ts'
 
 type AvailableModel = {
@@ -39,6 +39,16 @@ export function getMissingVideoV2ModelIds(models: readonly AvailableModel[]) {
       .filter(Boolean),
   )
   return VIDEO_V2_MODELS.filter((modelId) => !availableIds.has(modelId))
+}
+
+/** Keep the separately priced V2 adapter selectable when the gateway omits it. */
+export function getMissingVideoV2SpecialPriceModelIds(models: readonly AvailableModel[]) {
+  const availableIds = new Set(
+    models
+      .map((model) => normalizeModelId(model?.id).toLowerCase())
+      .filter(Boolean),
+  )
+  return VIDEO_V2_SPECIAL_PRICE_MODELS.filter((modelId) => !availableIds.has(modelId.toLowerCase()))
 }
 
 /** Keep the additional low-price V3 channel selectable when /v1/models omits it. */

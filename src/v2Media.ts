@@ -7,6 +7,9 @@ export const VIDEO_V2_MEDIA_LIMITS = {
 /** Canonical model ids handled by the shared Video V2 adapter. */
 export const VIDEO_V2_MODEL = 'video-v2' as const
 export const VIDEO_V2_FAST_MODEL = 'video-v2-fast' as const
+/** Additional special-price channel backed by the standard V2 request adapter. */
+export const VIDEO_V2_SPECIAL_PRICE_MODEL = 'video-v2-特价版' as const
+export const VIDEO_V2_SPECIAL_PRICE_MODELS = [VIDEO_V2_SPECIAL_PRICE_MODEL] as const
 /** Additional low-price channel ids backed by the same V2 adapters. */
 export const VIDEO_V2_LOW_PRICE_MODEL = 'video-v2（限时低价渠道）' as const
 export const VIDEO_V2_FAST_LOW_PRICE_MODEL = 'video-v2-fast（限时低价渠道）' as const
@@ -27,6 +30,7 @@ export const VIDEO_V2_LOW_PRICE_MODELS = [
 
 const VIDEO_V2_ADAPTER_MODELS = [
   ...VIDEO_V2_MODELS,
+  ...VIDEO_V2_SPECIAL_PRICE_MODELS,
   VIDEO_V2_LOW_PRICE_LEGACY_MODEL,
   VIDEO_V2_FAST_LOW_PRICE_LEGACY_MODEL,
 ] as const
@@ -40,6 +44,12 @@ export type VideoV2MediaCounts = {
   videos: number
   audios: number
 }
+
+const VIDEO_V2_SPECIAL_PRICE_MEDIA_LIMITS = {
+  images: 9,
+  videos: 0,
+  audios: 0,
+} as const
 
 export type VideoV2MentionResult = {
   prompt: string
@@ -69,6 +79,17 @@ function getSafeCount(value: number) {
 export function isVideoV2Model(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
   return VIDEO_V2_ADAPTER_MODELS.some((candidate) => candidate === normalizedModel)
+}
+
+export function isVideoV2SpecialPriceModel(model: unknown) {
+  const normalizedModel = String(model || '').trim().toLowerCase()
+  return normalizedModel === VIDEO_V2_SPECIAL_PRICE_MODEL
+}
+
+export function getVideoV2MediaLimitsForModel(model: unknown): VideoV2MediaCounts {
+  return isVideoV2SpecialPriceModel(model)
+    ? VIDEO_V2_SPECIAL_PRICE_MEDIA_LIMITS
+    : VIDEO_V2_MEDIA_LIMITS
 }
 
 export function isVideoV2FastModel(model: unknown) {

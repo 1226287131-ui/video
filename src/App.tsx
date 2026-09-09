@@ -110,7 +110,9 @@ import {
   type VideoV3Protocol,
 } from './videoV3'
 import {
+  getVideoV2MediaLimitsForModel,
   isVideoV2Model,
+  isVideoV2SpecialPriceModel,
   isValidVideoV2Duration,
   VIDEO_V2_MAX_DURATION,
   normalizeVideoV2Mentions,
@@ -124,7 +126,7 @@ import {
   MAX_PROMPT_FILE_BYTES,
   mergeImportedPrompt,
 } from './promptFileImport'
-import { getMissingVideoV2ModelIds, getMissingVideoV3Fixed480pModelIds, getMissingVideoV3LowPriceModelIds, getMissingVideoV3SpecialPriceModelIds, getReplacementModelId } from './modelSelection'
+import { getMissingVideoV2ModelIds, getMissingVideoV2SpecialPriceModelIds, getMissingVideoV3Fixed480pModelIds, getMissingVideoV3LowPriceModelIds, getMissingVideoV3SpecialPriceModelIds, getReplacementModelId } from './modelSelection'
 
 type VideoDuration = number
 type VideoRatio = 'auto' | '21:9' | '16:9' | '9:16' | '1:1' | '4:3' | '3:4' | '2:3' | '3:2'
@@ -773,6 +775,7 @@ function VideoStudioApp() {
   const videoV3ModelSelected = isVideoV3Model(form.model)
   const videoV3SpecialPriceModelSelected = isVideoV3SpecialPriceModel(form.model)
   const videoV2ModelSelected = isVideoV2Model(form.model)
+  const videoV2SpecialPriceModelSelected = isVideoV2SpecialPriceModel(form.model)
   const videoResourceModelSelected = videoV2ModelSelected || videoV3ModelSelected
   const miniMaxAspectRatio = isValidMiniMaxH3AspectRatio(form.ratio)
     ? form.ratio
@@ -783,7 +786,9 @@ function VideoStudioApp() {
   const grokUsesMultipleReferences = grokModelSelected && mode === 'image' && uniqueUploadedAssetsById(grokReferenceImages).length > 1
   const videoV2MediaLimits = miniMaxModelSelected
     ? { images: MINIMAX_H3_MAX_IMAGES, audios: MINIMAX_H3_MAX_AUDIOS, videos: MINIMAX_H3_MAX_VIDEOS }
-    : videoV3ModelSelected ? getVideoV3MediaLimitsForModel(form.model) : VIDEO_V2_MEDIA_LIMITS
+    : videoV3ModelSelected ? getVideoV3MediaLimitsForModel(form.model)
+      : videoV2ModelSelected ? getVideoV2MediaLimitsForModel(form.model)
+        : VIDEO_V2_MEDIA_LIMITS
   const videoV2ImageSizeLimit = getVideoV2ImageSizeLimit(form.model)
   const getVideoV2MediaLimit = (kind: V2MediaKind) => (
     kind === 'image'
@@ -944,6 +949,12 @@ function VideoStudioApp() {
             object: 'model',
             created: 0,
             owned_by: 'video-v2-adapter',
+          })),
+          ...getMissingVideoV2SpecialPriceModelIds(targetModels).map((id) => ({
+            id,
+            object: 'model',
+            created: 0,
+            owned_by: 'video-v2-special-price-adapter',
           })),
           ...getMissingVideoV3LowPriceModelIds(targetModels).map((id) => ({
             id,
@@ -1241,7 +1252,15 @@ function VideoStudioApp() {
       if (nextModelUsesVideoV2) {
         setImageSourceMode('upload')
         setImageInputMode('multiple')
-        setMessage(`${nextModel} 使用 /v1/videos：支持自定义 ${VIDEO_V2_MIN_DURATION}-${VIDEO_V2_MAX_DURATION} 秒，可纯文本生成，也可上传 ${VIDEO_V2_MEDIA_LIMITS.images} 图、${VIDEO_V2_MEDIA_LIMITS.audios} 音频、${VIDEO_V2_MEDIA_LIMITS.videos} 视频作为参考素材`)
+        if (isVideoV2SpecialPriceModel(nextModel)) {
+          setUploadedAudios([])
+          setUploadedVideoAudios([])
+          setUploadedVideos([])
+        }
+        const nextMediaLimits = getVideoV2MediaLimitsForModel(nextModel)
+        setMessage(isVideoV2SpecialPriceModel(nextModel)
+          ? `${nextModel} 使用 video-v2 请求参数：支持自定义 ${VIDEO_V2_MIN_DURATION}-${VIDEO_V2_MAX_DURATION} 秒，最多 ${nextMediaLimits.images} 张参考图，不支持参考视频和参考音频`
+          : `${nextModel} 使用 /v1/videos：支持自定义 ${VIDEO_V2_MIN_DURATION}-${VIDEO_V2_MAX_DURATION} 秒，可纯文本生成，也可上传 ${nextMediaLimits.images} 图、${nextMediaLimits.audios} 音频、${nextMediaLimits.videos} 视频作为参考素材`)
       }
       return
     }
@@ -2107,7 +2126,7 @@ function VideoStudioApp() {
     const historyUsesMiniMax = isMiniMaxH3VideoModel(item.model)
     const historyUsesMediaResource = historyUsesVideoResource || historyUsesMiniMax
     const historyUsesGrok = isGrokImagineVideoModel(item.model)
-    const historyVideoV2Limits = historyUsesVideoV3 ? getVideoV3MediaLimitsForModel(item.model) : historyUsesVideoV2 ? VIDEO_V2_MEDIA_LIMITS : { images: MAX_MINIMAX_IMAGES, audios: MINIMAX_H3_MAX_AUDIOS, videos: MINIMAX_H3_MAX_VIDEOS }
+    const historyVideoV2Limits = historyUsesVideoV3 ? getVideoV3MediaLimitsForModel(item.model) : historyUsesVideoV2 ? getVideoV2MediaLimitsForModel(item.model) : { images: MAX_MINIMAX_IMAGES, audios: MINIMAX_H3_MAX_AUDIOS, videos: MINIMAX_H3_MAX_VIDEOS }
     const referenceNumbers = historyUsesGrok ? [] : getReferenceMentionNumbers(item.prompt)
     const expectedReferenceCount = Math.max(Number(item.reference_count) || 0, ...referenceNumbers, 0)
     const expectedAudioCount = historyUsesMediaResource ? Number(item.reference_audio_count) || 0 : 0
@@ -2480,7 +2499,11 @@ function VideoStudioApp() {
     const useVideoV3Api = isVideoV3Model(formSnapshot.model)
     const useVideoV2Api = isVideoV2Model(formSnapshot.model)
     const useVideoResourceApi = useVideoV3Api || useVideoV2Api
-    const videoV2SubmissionLimits = useVideoV3Api ? getVideoV3MediaLimitsForModel(formSnapshot.model) : VIDEO_V2_MEDIA_LIMITS
+    const videoV2SubmissionLimits = useVideoV3Api
+      ? getVideoV3MediaLimitsForModel(formSnapshot.model)
+      : useVideoV2Api
+        ? getVideoV2MediaLimitsForModel(formSnapshot.model)
+        : VIDEO_V2_MEDIA_LIMITS
     const submissionMode = mode
     const submissionInputMode = imageInputMode
     const submissionImageSourceMode = imageSourceMode
@@ -3411,11 +3434,11 @@ function VideoStudioApp() {
                     <strong>参考素材</strong>
                     <span>提交时会以公网外链发送给当前模型的 JSON 协议</span>
                   </div>
-                  <span className="badge">{videoV2MediaLimits.images} 图 · {videoV3SpecialPriceModelSelected ? '不支持视频 · 不支持音频' : `${videoV2MediaLimits.videos} 视频 · ${videoV2MediaLimits.audios} 音频`}</span>
+                  <span className="badge">{videoV2MediaLimits.images} 图 · {(videoV3SpecialPriceModelSelected || videoV2SpecialPriceModelSelected) ? '不支持视频 · 不支持音频' : `${videoV2MediaLimits.videos} 视频 · ${videoV2MediaLimits.audios} 音频`}</span>
                 </div>
                 <div className="video-v2-media-grid">
                   {(['image', 'video', 'audio'] as V2MediaKind[])
-                    .filter((kind) => !videoV3SpecialPriceModelSelected || kind === 'image')
+                    .filter((kind) => !(videoV3SpecialPriceModelSelected || videoV2SpecialPriceModelSelected) || kind === 'image')
                     .map(renderVideoV2MediaSection)}
                 </div>
                 <div className="field-hint">
@@ -3425,6 +3448,8 @@ function VideoStudioApp() {
                     ? videoV3SpecialPriceModelSelected
                       ? 'video-v3-特价版最多支持 9 张参考图，不支持参考视频和参考音频。'
                       : `video-v3 原协议保留 4-30 秒和原画幅；${isVideoV3Fixed480pModel(form.model) ? 'video-v3-480p 固定 480p' : '其他 video-v3 模型固定 720p'}；wan-3.0 的参考素材会与顶层 prompt 一起按 images、videos、audios 数组提交。`
+                    : videoV2SpecialPriceModelSelected
+                      ? 'video-v2-特价版沿用 video-v2 请求参数，最多支持 9 张参考图，不支持参考视频和参考音频。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
                 </div>
               </div>

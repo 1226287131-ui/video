@@ -3,14 +3,17 @@ import { isVideoV3Model } from './videoV3.ts'
 import { isMiniMaxH3VideoModel } from './minimaxH3.ts'
 
 export {
+  getVideoV2MediaLimitsForModel,
   isVideoV2FastModel,
   isValidVideoV2Duration,
   isVideoV2Model,
+  isVideoV2SpecialPriceModel,
   VIDEO_V2_MAX_DURATION,
   VIDEO_V2_FAST_MODEL,
   VIDEO_V2_MIN_DURATION,
   VIDEO_V2_MODEL,
   VIDEO_V2_MODELS,
+  VIDEO_V2_SPECIAL_PRICE_MODEL,
 } from './v2Media.ts'
 export { isMiniMaxH3VideoModel, MINIMAX_H3_VIDEO_MODEL, MINIMAX_H3_VIDEO_MODELS } from './minimaxH3.ts'
 export {

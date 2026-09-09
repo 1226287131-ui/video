@@ -7,16 +7,18 @@ import {
   getVideoTaskPath,
   isVideoV2FastModel,
   isVideoV2Model,
+  isVideoV2SpecialPriceModel,
   isValidVideoV2Duration,
 } from '../src/videoApi.ts'
 import { buildVideoV2SubmitPayload } from '../src/videoPayload.ts'
 import {
+  getVideoV2MediaLimitsForModel,
   normalizeVideoV2Mentions,
   validateVideoV2Mentions,
 } from '../src/v2Media.ts'
 
 test('recognizes supported video-v2 models without case sensitivity', () => {
-  for (const model of ['video-v2', ' VIDEO-V2-FAST ', 'video-v2（限时低价渠道）', 'video-v2-fast（限时低价渠道）', 'video-v2-fast（限时低价低价渠道）']) {
+  for (const model of ['video-v2', ' VIDEO-V2-FAST ', 'video-v2（限时低价渠道）', 'video-v2-fast（限时低价渠道）', 'video-v2-fast（限时低价低价渠道）', 'video-v2-特价版']) {
     assert.equal(isVideoV2Model(model), true)
   }
   assert.equal(isVideoV2Model(' Video-V2-Mini '), false)
@@ -25,6 +27,12 @@ test('recognizes supported video-v2 models without case sensitivity', () => {
   assert.equal(isVideoV2Model('video-v2-mini-720'), false)
   assert.equal(isVideoV2Model('video-v20'), false)
   assert.equal(isVideoV2Model('video-v1'), false)
+})
+
+test('uses the special-price V2 media restrictions', () => {
+  assert.equal(isVideoV2SpecialPriceModel(' VIDEO-V2-特价版 '), true)
+  assert.deepEqual(getVideoV2MediaLimitsForModel('video-v2-特价版'), { images: 9, videos: 0, audios: 0 })
+  assert.deepEqual(getVideoV2MediaLimitsForModel('video-v2'), { images: 9, videos: 3, audios: 3 })
 })
 
 test('identifies video-v2-fast as the fast adapter alias without broadening the match', () => {
@@ -133,6 +141,30 @@ test('rejects V2 durations outside the configured 5-15 second range', () => {
   assert.throws(() => buildVideoV2SubmitPayload({ ...shared, duration: 4 }), /5 到 15/)
   assert.throws(() => buildVideoV2SubmitPayload({ ...shared, duration: 16 }), /5 到 15/)
   assert.throws(() => buildVideoV2SubmitPayload({ ...shared, duration: 7.5 }), /5 到 15/)
+})
+
+test('rejects unsupported special-price V2 reference media', () => {
+  const shared = {
+    model: 'video-v2-特价版',
+    prompt: 'reference subject',
+    images: [],
+    videos: [],
+    audios: [],
+    aspectRatio: '16:9',
+    duration: 5,
+    resolution: '720p',
+    generateAudio: true,
+  }
+  assert.doesNotThrow(() => buildVideoV2SubmitPayload({
+    ...shared,
+    images: Array.from({ length: 9 }, (_, index) => `https://example.com/${index}.jpg`),
+  }))
+  assert.throws(() => buildVideoV2SubmitPayload({
+    ...shared,
+    images: Array.from({ length: 10 }, (_, index) => `https://example.com/${index}.jpg`),
+  }), /最多支持 9 张参考图/)
+  assert.throws(() => buildVideoV2SubmitPayload({ ...shared, videos: ['https://example.com/reference.mp4'] }), /不支持参考视频/)
+  assert.throws(() => buildVideoV2SubmitPayload({ ...shared, audios: ['https://example.com/reference.mp3'] }), /不支持参考音频/)
 })
 
 test('rejects models without an internal video-v2 request configuration', () => {
