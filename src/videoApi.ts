@@ -1,4 +1,4 @@
-import { isVideoV2Model } from './v2Media.ts'
+import { isVideoV2Model, isVideoV2SpecialPriceModel } from './v2Media.ts'
 import { isVideoV3Model } from './videoV3.ts'
 import { isMiniMaxH3VideoModel } from './minimaxH3.ts'
 
@@ -52,6 +52,7 @@ function usesVideoResourceApi(model: unknown) {
 }
 
 export function getVideoSubmitPath(model: string) {
+  if (isVideoV2SpecialPriceModel(model)) return '/v1/videos/generations'
   return usesVideoResourceApi(model) ? '/v1/videos' : '/v1/video/generations'
 }
 

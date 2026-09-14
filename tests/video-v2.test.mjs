@@ -56,6 +56,11 @@ test('routes video-v2 resources through /v1/videos while legacy routing is uncha
     assert.equal(getVideoContentPath(model, 'task/a'), '/v1/videos/task%2Fa/content')
   }
 
+  assert.equal(getVideoSubmitPath('video-v2-特价版'), '/v1/videos/generations')
+  assert.equal(getVideoSubmitPath(' VIDEO-V2-特价版 '), '/v1/videos/generations')
+  assert.equal(getVideoTaskPath('video-v2-特价版', 'task/a'), '/v1/videos/task%2Fa')
+  assert.equal(getVideoContentPath('video-v2-特价版', 'task/a'), '/v1/videos/task%2Fa/content')
+
   for (const model of ['video-v1', 'video-v2-mini', 'video-v2-满血兜底版']) {
     assert.equal(getVideoSubmitPath(model), '/v1/video/generations')
     assert.equal(getVideoTaskPath(model, 'task/a'), '/v1/video/generations/task%2Fa')
