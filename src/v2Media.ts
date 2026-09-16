@@ -47,8 +47,8 @@ export type VideoV2MediaCounts = {
 
 const VIDEO_V2_SPECIAL_PRICE_MEDIA_LIMITS = {
   images: 9,
-  videos: 0,
-  audios: 0,
+  videos: 3,
+  audios: 3,
 } as const
 
 export type VideoV2MentionResult = {

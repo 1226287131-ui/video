@@ -29,9 +29,9 @@ test('recognizes supported video-v2 models without case sensitivity', () => {
   assert.equal(isVideoV2Model('video-v1'), false)
 })
 
-test('uses the special-price V2 media restrictions', () => {
+test('uses the special-price V2 media limits', () => {
   assert.equal(isVideoV2SpecialPriceModel(' VIDEO-V2-特价版 '), true)
-  assert.deepEqual(getVideoV2MediaLimitsForModel('video-v2-特价版'), { images: 9, videos: 0, audios: 0 })
+  assert.deepEqual(getVideoV2MediaLimitsForModel('video-v2-特价版'), { images: 9, videos: 3, audios: 3 })
   assert.deepEqual(getVideoV2MediaLimitsForModel('video-v2'), { images: 9, videos: 3, audios: 3 })
 })
 
@@ -148,7 +148,7 @@ test('rejects V2 durations outside the configured 5-15 second range', () => {
   assert.throws(() => buildVideoV2SubmitPayload({ ...shared, duration: 7.5 }), /5 到 15/)
 })
 
-test('rejects unsupported special-price V2 reference media', () => {
+test('supports special-price V2 reference videos and audios within their limits', () => {
   const shared = {
     model: 'video-v2-特价版',
     prompt: 'reference subject',
@@ -160,16 +160,27 @@ test('rejects unsupported special-price V2 reference media', () => {
     resolution: '720p',
     generateAudio: true,
   }
-  assert.doesNotThrow(() => buildVideoV2SubmitPayload({
+  const payload = buildVideoV2SubmitPayload({
     ...shared,
     images: Array.from({ length: 9 }, (_, index) => `https://example.com/${index}.jpg`),
-  }))
+    videos: Array.from({ length: 3 }, (_, index) => `https://example.com/${index}.mp4`),
+    audios: Array.from({ length: 3 }, (_, index) => `https://example.com/${index}.mp3`),
+  })
+  assert.equal(payload.images.length, 9)
+  assert.equal(payload.videos.length, 3)
+  assert.equal(payload.audios.length, 3)
   assert.throws(() => buildVideoV2SubmitPayload({
     ...shared,
     images: Array.from({ length: 10 }, (_, index) => `https://example.com/${index}.jpg`),
   }), /最多支持 9 张参考图/)
-  assert.throws(() => buildVideoV2SubmitPayload({ ...shared, videos: ['https://example.com/reference.mp4'] }), /不支持参考视频/)
-  assert.throws(() => buildVideoV2SubmitPayload({ ...shared, audios: ['https://example.com/reference.mp3'] }), /不支持参考音频/)
+  assert.throws(() => buildVideoV2SubmitPayload({
+    ...shared,
+    videos: Array.from({ length: 4 }, (_, index) => `https://example.com/${index}.mp4`),
+  }), /最多支持 3 个参考视频/)
+  assert.throws(() => buildVideoV2SubmitPayload({
+    ...shared,
+    audios: Array.from({ length: 4 }, (_, index) => `https://example.com/${index}.mp3`),
+  }), /最多支持 3 个参考音频/)
 })
 
 test('rejects models without an internal video-v2 request configuration', () => {

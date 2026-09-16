@@ -1252,14 +1252,9 @@ function VideoStudioApp() {
       if (nextModelUsesVideoV2) {
         setImageSourceMode('upload')
         setImageInputMode('multiple')
-        if (isVideoV2SpecialPriceModel(nextModel)) {
-          setUploadedAudios([])
-          setUploadedVideoAudios([])
-          setUploadedVideos([])
-        }
         const nextMediaLimits = getVideoV2MediaLimitsForModel(nextModel)
         setMessage(isVideoV2SpecialPriceModel(nextModel)
-          ? `${nextModel} 使用 video-v2 请求参数：支持自定义 ${VIDEO_V2_MIN_DURATION}-${VIDEO_V2_MAX_DURATION} 秒，最多 ${nextMediaLimits.images} 张参考图，不支持参考视频和参考音频`
+          ? `${nextModel} 使用 video-v2 请求参数：支持自定义 ${VIDEO_V2_MIN_DURATION}-${VIDEO_V2_MAX_DURATION} 秒，可上传 ${nextMediaLimits.images} 图、${nextMediaLimits.videos} 视频、${nextMediaLimits.audios} 音频作为参考素材`
           : `${nextModel} 使用 /v1/videos：支持自定义 ${VIDEO_V2_MIN_DURATION}-${VIDEO_V2_MAX_DURATION} 秒，可纯文本生成，也可上传 ${nextMediaLimits.images} 图、${nextMediaLimits.audios} 音频、${nextMediaLimits.videos} 视频作为参考素材`)
       }
       return
@@ -3434,11 +3429,11 @@ function VideoStudioApp() {
                     <strong>参考素材</strong>
                     <span>提交时会以公网外链发送给当前模型的 JSON 协议</span>
                   </div>
-                  <span className="badge">{videoV2MediaLimits.images} 图 · {(videoV3SpecialPriceModelSelected || videoV2SpecialPriceModelSelected) ? '不支持视频 · 不支持音频' : `${videoV2MediaLimits.videos} 视频 · ${videoV2MediaLimits.audios} 音频`}</span>
+                  <span className="badge">{videoV2MediaLimits.images} 图 · {videoV3SpecialPriceModelSelected ? '不支持视频 · 不支持音频' : `${videoV2MediaLimits.videos} 视频 · ${videoV2MediaLimits.audios} 音频`}</span>
                 </div>
                 <div className="video-v2-media-grid">
                   {(['image', 'video', 'audio'] as V2MediaKind[])
-                    .filter((kind) => !(videoV3SpecialPriceModelSelected || videoV2SpecialPriceModelSelected) || kind === 'image')
+                    .filter((kind) => !videoV3SpecialPriceModelSelected || kind === 'image')
                     .map(renderVideoV2MediaSection)}
                 </div>
                 <div className="field-hint">
@@ -3449,7 +3444,7 @@ function VideoStudioApp() {
                       ? 'video-v3-特价版最多支持 9 张参考图，不支持参考视频和参考音频。'
                       : `video-v3 原协议保留 4-30 秒和原画幅；${isVideoV3Fixed480pModel(form.model) ? 'video-v3-480p 固定 480p' : '其他 video-v3 模型固定 720p'}；wan-3.0 的参考素材会与顶层 prompt 一起按 images、videos、audios 数组提交。`
                     : videoV2SpecialPriceModelSelected
-                      ? 'video-v2-特价版沿用 video-v2 请求参数，最多支持 9 张参考图，不支持参考视频和参考音频。'
+                      ? 'video-v2-特价版沿用 video-v2 请求参数，最多支持 9 张参考图、3 个参考视频和 3 个参考音频；请求会按 images、videos、audios 数组提交。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
                 </div>
               </div>
