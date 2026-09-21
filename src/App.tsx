@@ -126,7 +126,7 @@ import {
   MAX_PROMPT_FILE_BYTES,
   mergeImportedPrompt,
 } from './promptFileImport'
-import { getMissingVideoV2ModelIds, getMissingVideoV2SpecialPriceModelIds, getMissingVideoV3Fixed480pModelIds, getMissingVideoV3LowPriceModelIds, getMissingVideoV3SpecialPriceModelIds, getReplacementModelId } from './modelSelection'
+import { getReplacementModelId } from './modelSelection'
 
 type VideoDuration = number
 type VideoRatio = 'auto' | '21:9' | '16:9' | '9:16' | '1:1' | '4:3' | '3:4' | '2:3' | '3:2'
@@ -910,80 +910,49 @@ function VideoStudioApp() {
 
   // 防抖加载模型列表
   useEffect(() => {
+    setModels([])
+    setLoadingModels(false)
+
     if (!apiKey.startsWith('sk-') || apiKey.length < 20) {
-      setModels([])
       return
     }
     
     window.localStorage.setItem(API_KEY_STORAGE, apiKey)
+    const controller = new AbortController()
     const timeoutId = setTimeout(() => {
-      fetchModels(apiKey)
+      void fetchModels(apiKey, controller.signal)
     }, 600)
 
-    return () => clearTimeout(timeoutId)
+    return () => {
+      clearTimeout(timeoutId)
+      controller.abort()
+    }
   }, [apiKey])
 
-  async function fetchModels(key: string) {
+  async function fetchModels(key: string, signal: AbortSignal) {
     setLoadingModels(true)
     try {
       const res = await fetch(`${API_BASE_URL}/v1/models`, {
-        headers: { Authorization: `Bearer ${key}` }
+        headers: { Authorization: `Bearer ${key}` },
+        signal,
       })
-      if (res.ok) {
-        const data = await res.json()
-        const items = Array.isArray(data.data) ? data.data : []
-        // 这里尝试过滤一下只含有视频属性的模型，如果没有特殊属性就全展出
-        const videoModels = items.filter((m: ModelInfo) => {
-          const id = String(m.id || '').toLowerCase()
-          return id === 'wan-3.0' || id.includes('video') || id.includes('sora') || id.includes('runway') || id.includes('kling') || id.includes('minimax') || id.includes('h3') || id.includes('seedance') || id.includes('sd2.5') || id.includes('sd-2.5')
-        })
-        const targetModels = videoModels.length > 0 ? videoModels : items
-        // Keep the two V2 aliases selectable even when the gateway's model
-        // listing is incomplete. The submit adapter already validates and
-        // routes both ids through the same /v1/videos contract.
-        const missingVideoV2Models = getMissingVideoV2ModelIds(targetModels)
-        const enrichedModels = [
-          ...targetModels,
-          ...missingVideoV2Models.map((id) => ({
-            id,
-            object: 'model',
-            created: 0,
-            owned_by: 'video-v2-adapter',
-          })),
-          ...getMissingVideoV2SpecialPriceModelIds(targetModels).map((id) => ({
-            id,
-            object: 'model',
-            created: 0,
-            owned_by: 'video-v2-special-price-adapter',
-          })),
-          ...getMissingVideoV3LowPriceModelIds(targetModels).map((id) => ({
-            id,
-            object: 'model',
-            created: 0,
-            owned_by: 'video-v3-adapter',
-          })),
-          ...getMissingVideoV3Fixed480pModelIds(targetModels).map((id) => ({
-            id,
-            object: 'model',
-            created: 0,
-            owned_by: 'video-v3-480p-adapter',
-          })),
-          ...getMissingVideoV3SpecialPriceModelIds(targetModels).map((id) => ({
-            id,
-            object: 'model',
-            created: 0,
-            owned_by: 'video-v3-special-price-adapter',
-          })),
-        ]
-
-        setModels(enrichedModels)
-        setMessage(`成功加载可用模型（共 ${enrichedModels.length} 个）`)
+      if (!res.ok) {
+        throw new Error(`获取模型失败（HTTP ${res.status}）`)
       }
+
+      const data = await res.json()
+      if (signal.aborted) return
+
+      const items: ModelInfo[] = Array.isArray(data.data) ? data.data : []
+      setModels(items)
+      setMessage(`成功加载可用模型（共 ${items.length} 个）`)
     } catch (err) {
+      if (signal.aborted) return
       console.error('获取模型失败:', err)
+      setModels([])
       setMessage('获取可用模型失败，请检查 API Key')
     } finally {
-      setLoadingModels(false)
+      if (!signal.aborted) setLoadingModels(false)
     }
   }
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getMissingVideoV2ModelIds, getMissingVideoV2SpecialPriceModelIds, getMissingVideoV3Fixed480pModelIds, getMissingVideoV3LowPriceModelIds, getMissingVideoV3SpecialPriceModelIds, getReplacementModelId } from '../src/modelSelection.ts'
+import { getReplacementModelId } from '../src/modelSelection.ts'
 
 test('uses the first available model when the stored model has been taken offline', () => {
   const replacement = getReplacementModelId('video-v1', [
@@ -27,46 +27,4 @@ test('uses the API canonical id when only its letter casing changes', () => {
   ])
 
   assert.equal(replacement, 'grok-imagine-1.5-video')
-})
-
-test('keeps both Video V2 aliases selectable when the gateway omits them', () => {
-  assert.deepEqual(getMissingVideoV2ModelIds([{ id: 'video-v2' }]), [
-    'video-v2-fast',
-    'video-v2（限时低价渠道）',
-    'video-v2-fast（限时低价渠道）',
-  ])
-  assert.deepEqual(getMissingVideoV2ModelIds([
-    { id: 'VIDEO-V2' },
-    { id: 'VIDEO-V2-FAST' },
-    { id: 'video-v2（限时低价渠道）' },
-    { id: 'video-v2-fast（限时低价渠道）' },
-  ]), [])
-})
-
-test('keeps the special-price V2 adapter selectable when the gateway omits it', () => {
-  assert.deepEqual(getMissingVideoV2SpecialPriceModelIds([{ id: 'video-v2' }]), [
-    'video-v2-特价版',
-  ])
-  assert.deepEqual(getMissingVideoV2SpecialPriceModelIds([{ id: 'VIDEO-V2-特价版' }]), [])
-})
-
-test('keeps low-price V3 channel aliases selectable when the gateway omits them', () => {
-  assert.deepEqual(getMissingVideoV3LowPriceModelIds([{ id: 'video-v3（限时低价渠道）' }]), [])
-  assert.deepEqual(getMissingVideoV3LowPriceModelIds([{ id: 'video-v3' }]), [
-    'video-v3（限时低价渠道）',
-  ])
-})
-
-test('keeps the fixed 480p V3 adapter selectable when the gateway omits it', () => {
-  assert.deepEqual(getMissingVideoV3Fixed480pModelIds([{ id: 'video-v3' }]), [
-    'video-v3-480p',
-  ])
-  assert.deepEqual(getMissingVideoV3Fixed480pModelIds([{ id: 'VIDEO-V3-480P' }]), [])
-})
-
-test('keeps the special-price V3 adapter selectable when the gateway omits it', () => {
-  assert.deepEqual(getMissingVideoV3SpecialPriceModelIds([{ id: 'video-v3' }]), [
-    'video-v3-特价版',
-  ])
-  assert.deepEqual(getMissingVideoV3SpecialPriceModelIds([{ id: 'VIDEO-V3-特价版' }]), [])
 })
