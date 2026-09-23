@@ -1,6 +1,8 @@
 export const VIDEO_V3_MODELS = [
   'video-v3',
   'video-v3-480p',
+  'video-v3-720P（按条计费）',
+  'video-v3-480P（按条计费）',
   'video-v3-特价版',
   'video-v3（限时低价渠道）',
   'wan-3.0',
@@ -12,6 +14,11 @@ export const VIDEO_V3_MODELS = [
 
 export const VIDEO_V3_FIXED_480P_MODELS = [
   'video-v3-480p',
+  'video-v3-480P（按条计费）',
+] as const
+
+export const VIDEO_V3_FIXED_720P_MODELS = [
+  'video-v3-720P（按条计费）',
 ] as const
 
 export const VIDEO_V3_SPECIAL_PRICE_MODELS = [
@@ -63,12 +70,17 @@ export type VideoV3MediaCounts = {
 
 export function isVideoV3Model(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
-  return (VIDEO_V3_ADAPTER_MODELS as readonly string[]).some((candidate) => candidate === normalizedModel)
+  return (VIDEO_V3_ADAPTER_MODELS as readonly string[]).some((candidate) => candidate.toLowerCase() === normalizedModel)
 }
 
 export function isVideoV3Fixed480pModel(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
-  return (VIDEO_V3_FIXED_480P_MODELS as readonly string[]).some((candidate) => candidate === normalizedModel)
+  return (VIDEO_V3_FIXED_480P_MODELS as readonly string[]).some((candidate) => candidate.toLowerCase() === normalizedModel)
+}
+
+export function isVideoV3Fixed720pModel(model: unknown) {
+  const normalizedModel = String(model || '').trim().toLowerCase()
+  return (VIDEO_V3_FIXED_720P_MODELS as readonly string[]).some((candidate) => candidate.toLowerCase() === normalizedModel)
 }
 
 export function isVideoV3SpecialPriceModel(model: unknown) {
@@ -127,6 +139,7 @@ export function isValidVideoV3ResolutionForProtocol(value: unknown, protocol: Vi
 
 export function isValidVideoV3ResolutionForModel(value: unknown, model: unknown, protocol: VideoV3Protocol) {
   if (isVideoV3Fixed480pModel(model)) return value === '480p'
+  if (isVideoV3Fixed720pModel(model)) return value === '720p'
   return isValidVideoV3ResolutionForProtocol(value, protocol)
 }
 

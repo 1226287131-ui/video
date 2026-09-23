@@ -105,7 +105,6 @@ import {
   VIDEO_V3_RATIOS,
   getVideoV3DefaultResolution,
   getVideoV3MediaLimitsForModel,
-  isVideoV3Fixed480pModel,
   isVideoV3SpecialPriceModel,
   type VideoV3Protocol,
 } from './videoV3'
@@ -3411,7 +3410,7 @@ function VideoStudioApp() {
                     : videoV3ModelSelected
                     ? videoV3SpecialPriceModelSelected
                       ? 'video-v3-特价版最多支持 9 张参考图，不支持参考视频和参考音频。'
-                      : `video-v3 原协议保留 4-30 秒和原画幅；${isVideoV3Fixed480pModel(form.model) ? 'video-v3-480p 固定 480p' : '其他 video-v3 模型固定 720p'}；wan-3.0 的参考素材会与顶层 prompt 一起按 images、videos、audios 数组提交。`
+                      : `${form.model} 使用 video-v3 参数：4-30 秒、${videoV2MediaLimits.images} 图、${videoV2MediaLimits.videos} 视频、${videoV2MediaLimits.audios} 音频，固定 ${getVideoV3DefaultResolution(form.model, 'legacy')}。`
                     : videoV2SpecialPriceModelSelected
                       ? 'video-v2-特价版沿用 video-v2 请求参数，最多支持 9 张参考图、3 个参考视频和 3 个参考音频；请求会按 images、videos、audios 数组提交。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}

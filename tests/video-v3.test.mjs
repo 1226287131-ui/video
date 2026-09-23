@@ -23,6 +23,7 @@ import {
   getVideoV3DefaultResolution,
   getVideoV3MediaLimitsForModel,
   isVideoV3Fixed480pModel,
+  isVideoV3Fixed720pModel,
   isVideoV3SpecialPriceModel,
   isValidVideoV3ResolutionForModel,
   usesVideoV3TopLevelMedia,
@@ -46,6 +47,37 @@ test('keeps video-v3-480p on the shared adapter while enforcing 480p', () => {
   assert.equal(isValidVideoV3ResolutionForModel('480p', 'video-v3-480p', 'legacy'), true)
   assert.equal(isValidVideoV3ResolutionForModel('720p', 'video-v3-480p', 'legacy'), false)
   assert.equal(isValidVideoV3ResolutionForModel('720p', 'video-v3', 'legacy'), true)
+})
+
+test('per-item video-v3 models use the shared adapter with fixed resolutions and 30/10/10 media limits', () => {
+  const models = [
+    ['video-v3-720P（按条计费）', '720p', '480p'],
+    ['video-v3-480P（按条计费）', '480p', '720p'],
+  ]
+  const images = Array.from({ length: 30 }, (_, i) => `https://cdn.example.com/image-${i}.jpg`)
+  const videos = Array.from({ length: 10 }, (_, i) => `https://cdn.example.com/video-${i}.mp4`)
+  const audios = Array.from({ length: 10 }, (_, i) => `https://cdn.example.com/audio-${i}.mp3`)
+
+  for (const [model, resolution, invalidResolution] of models) {
+    assert.equal(isVideoV3Model(model), true)
+    assert.equal(getVideoSubmitPath(model), '/v1/videos')
+    assert.equal(getVideoV3DefaultResolution(model, 'legacy'), resolution)
+    assert.deepEqual(getVideoV3MediaLimitsForModel(model), { images: 30, videos: 10, audios: 10 })
+    const input = { model, prompt: '使用全部参考素材', duration: 30, ratio: '16:9', images, videos, audios, generateAudio: true }
+    const payload = buildVideoV3SubmitPayload(input)
+    assert.equal(payload.model, model)
+    assert.equal(payload.resolution, resolution)
+    assert.equal(payload.content.length, 51)
+    assert.equal(payload.content.filter((item) => item.type === 'image_url').length, 30)
+    assert.equal(payload.content.filter((item) => item.type === 'video_url').length, 10)
+    assert.equal(payload.content.filter((item) => item.type === 'audio_url').length, 10)
+    assert.throws(() => buildVideoV3SubmitPayload({ ...input, resolution: invalidResolution }), /resolution 固定为/)
+    assert.throws(() => buildVideoV3SubmitPayload({ ...input, images: [...images, 'https://cdn.example.com/extra.jpg'] }), /最多支持 30/)
+    assert.throws(() => buildVideoV3SubmitPayload({ ...input, videos: [...videos, 'https://cdn.example.com/extra.mp4'] }), /最多支持 10/)
+    assert.throws(() => buildVideoV3SubmitPayload({ ...input, audios: [...audios, 'https://cdn.example.com/extra.mp3'] }), /最多支持 10/)
+  }
+  assert.equal(isVideoV3Fixed720pModel(models[0][0]), true)
+  assert.equal(isVideoV3Fixed480pModel(models[1][0]), true)
 })
 
 test('limits video-v3-特价版 to nine images and disallows video/audio references', () => {

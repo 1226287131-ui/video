@@ -247,8 +247,8 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
     throw new Error(protocol === 'qy'
       ? 'QY 协议的 resolution 仅支持 480p 或 720p'
       : isVideoV3Fixed480pModel(input.model)
-        ? 'video-v3-480p 的 resolution 固定为 480p'
-        : '原协议的 resolution 固定为 720p')
+        ? `${input.model} 的 resolution 固定为 480p`
+        : `${input.model} 的 resolution 固定为 720p`)
   }
 
   const normalizeOptionalUrl = (value: unknown, label: string) => {
