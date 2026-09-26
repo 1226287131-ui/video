@@ -110,9 +110,12 @@ import {
 } from './videoV3'
 import {
   getVideoV2MediaLimitsForModel,
+  getVideoV2DefaultResolution,
   isVideoV2Model,
   isVideoV2SpecialPriceModel,
+  isVideoV2FixedResolutionModel,
   isValidVideoV2Duration,
+  isValidVideoV2ResolutionForModel,
   VIDEO_V2_MAX_DURATION,
   normalizeVideoV2Mentions,
   VIDEO_V2_MEDIA_LIMITS,
@@ -1211,7 +1214,9 @@ function VideoStudioApp() {
           : (ratioPresets.includes(current.ratio) ? current.ratio : '16:9'),
         quality: nextModelUsesVideoV2 ? 'hd' : current.quality,
         resolution: nextModelUsesVideoV2
-          ? (isVideoV2Model(current.model) ? current.resolution : '480p')
+          ? (isVideoV2FixedResolutionModel(nextModel)
+              ? getVideoV2DefaultResolution(nextModel)
+              : (isVideoV2Model(current.model) ? current.resolution : getVideoV2DefaultResolution(nextModel)))
           : current.resolution,
         generateAudio: nextModelUsesVideoV2
           ? (isVideoV2Model(current.model) ? current.generateAudio : true)
@@ -2610,6 +2615,11 @@ function VideoStudioApp() {
       setShowSettings(true)
       return
     }
+    if (useVideoV2Api && !isValidVideoV2ResolutionForModel(formSnapshot.resolution, formSnapshot.model)) {
+      setMessage(`${formSnapshot.model} 的分辨率固定为 ${getVideoV2DefaultResolution(formSnapshot.model)}`)
+      setShowSettings(true)
+      return
+    }
 
     if (useMiniMaxApi) {
       const miniMaxTotalReferences = referenceUrls.length + referenceAudioUrls.length + referenceVideoUrls.length
@@ -3999,18 +4009,22 @@ function VideoStudioApp() {
                   <>
                     <div className="options-group">
                       <span className="options-group-label"><Settings2 size={14} /> 输出清晰度</span>
-                      <div className="segmented">
-                        {videoResolutionPresets.map((val) => (
-                          <button
-                            type="button"
-                            key={val}
-                            className={`segmented-item ${form.resolution === val ? 'is-active' : ''}`}
-                            onClick={() => updateField('resolution', val)}
-                          >
-                            {val}
-                          </button>
-                        ))}
-                      </div>
+                      {isVideoV2FixedResolutionModel(form.model) ? (
+                        <span className="badge">固定 {getVideoV2DefaultResolution(form.model)}</span>
+                      ) : (
+                        <div className="segmented">
+                          {videoResolutionPresets.map((val) => (
+                            <button
+                              type="button"
+                              key={val}
+                              className={`segmented-item ${form.resolution === val ? 'is-active' : ''}`}
+                              onClick={() => updateField('resolution', val)}
+                            >
+                              {val}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="options-group">
                       <span className="options-group-label"><Settings2 size={14} /> 生成音频</span>

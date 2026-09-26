@@ -4,16 +4,21 @@ import { isMiniMaxH3VideoModel } from './minimaxH3.ts'
 
 export {
   getVideoV2MediaLimitsForModel,
+  getVideoV2DefaultResolution,
   isVideoV2FastModel,
   isValidVideoV2Duration,
   isVideoV2Model,
   isVideoV2SpecialPriceModel,
+  isVideoV2FixedResolutionModel,
+  isValidVideoV2ResolutionForModel,
   VIDEO_V2_MAX_DURATION,
   VIDEO_V2_FAST_MODEL,
   VIDEO_V2_MIN_DURATION,
   VIDEO_V2_MODEL,
   VIDEO_V2_MODELS,
   VIDEO_V2_SPECIAL_PRICE_MODEL,
+  VIDEO_V2_FIXED_720P_MODEL,
+  VIDEO_V2_FIXED_480P_MODEL,
 } from './v2Media.ts'
 export { isMiniMaxH3VideoModel, MINIMAX_H3_VIDEO_MODEL, MINIMAX_H3_VIDEO_MODELS } from './minimaxH3.ts'
 export {

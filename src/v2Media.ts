@@ -10,6 +10,13 @@ export const VIDEO_V2_FAST_MODEL = 'video-v2-fast' as const
 /** Additional special-price channel backed by the standard V2 request adapter. */
 export const VIDEO_V2_SPECIAL_PRICE_MODEL = 'video-v2-特价版' as const
 export const VIDEO_V2_SPECIAL_PRICE_MODELS = [VIDEO_V2_SPECIAL_PRICE_MODEL] as const
+/** Per-second channels backed by the standard V2 request adapter. */
+export const VIDEO_V2_FIXED_720P_MODEL = 'video-v2-720P（按秒计费）' as const
+export const VIDEO_V2_FIXED_480P_MODEL = 'video-v2-480P（按秒计费）' as const
+export const VIDEO_V2_FIXED_RESOLUTION_MODELS = [
+  VIDEO_V2_FIXED_720P_MODEL,
+  VIDEO_V2_FIXED_480P_MODEL,
+] as const
 /** Additional low-price channel ids backed by the same V2 adapters. */
 export const VIDEO_V2_LOW_PRICE_MODEL = 'video-v2（限时低价渠道）' as const
 export const VIDEO_V2_FAST_LOW_PRICE_MODEL = 'video-v2-fast（限时低价渠道）' as const
@@ -19,6 +26,7 @@ const VIDEO_V2_FAST_LOW_PRICE_LEGACY_MODEL = 'video-v2-fast（限时低价低价
 export const VIDEO_V2_MODELS = [
   VIDEO_V2_MODEL,
   VIDEO_V2_FAST_MODEL,
+  ...VIDEO_V2_FIXED_RESOLUTION_MODELS,
   VIDEO_V2_LOW_PRICE_MODEL,
   VIDEO_V2_FAST_LOW_PRICE_MODEL,
 ] as const
@@ -78,7 +86,31 @@ function getSafeCount(value: number) {
 
 export function isVideoV2Model(model: unknown) {
   const normalizedModel = String(model || '').trim().toLowerCase()
-  return VIDEO_V2_ADAPTER_MODELS.some((candidate) => candidate === normalizedModel)
+  return VIDEO_V2_ADAPTER_MODELS.some((candidate) => candidate.toLowerCase() === normalizedModel)
+}
+
+export function isVideoV2Fixed720pModel(model: unknown) {
+  return String(model || '').trim().toLowerCase() === VIDEO_V2_FIXED_720P_MODEL.toLowerCase()
+}
+
+export function isVideoV2Fixed480pModel(model: unknown) {
+  return String(model || '').trim().toLowerCase() === VIDEO_V2_FIXED_480P_MODEL.toLowerCase()
+}
+
+export function isVideoV2FixedResolutionModel(model: unknown) {
+  return isVideoV2Fixed720pModel(model) || isVideoV2Fixed480pModel(model)
+}
+
+export function getVideoV2DefaultResolution(model: unknown): '480p' | '720p' {
+  if (isVideoV2Fixed720pModel(model)) return '720p'
+  if (isVideoV2Fixed480pModel(model)) return '480p'
+  return '480p'
+}
+
+export function isValidVideoV2ResolutionForModel(value: unknown, model: unknown) {
+  if (isVideoV2Fixed720pModel(model)) return value === '720p'
+  if (isVideoV2Fixed480pModel(model)) return value === '480p'
+  return value === '480p' || value === '720p' || value === '1080p'
 }
 
 export function isVideoV2SpecialPriceModel(model: unknown) {

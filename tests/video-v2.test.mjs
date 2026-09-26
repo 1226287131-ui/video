@@ -8,6 +8,9 @@ import {
   isVideoV2FastModel,
   isVideoV2Model,
   isVideoV2SpecialPriceModel,
+  getVideoV2DefaultResolution,
+  isVideoV2FixedResolutionModel,
+  isValidVideoV2ResolutionForModel,
   isValidVideoV2Duration,
 } from '../src/videoApi.ts'
 import { buildVideoV2SubmitPayload } from '../src/videoPayload.ts'
@@ -33,6 +36,52 @@ test('uses the special-price V2 media limits', () => {
   assert.equal(isVideoV2SpecialPriceModel(' VIDEO-V2-特价版 '), true)
   assert.deepEqual(getVideoV2MediaLimitsForModel('video-v2-特价版'), { images: 9, videos: 3, audios: 3 })
   assert.deepEqual(getVideoV2MediaLimitsForModel('video-v2'), { images: 9, videos: 3, audios: 3 })
+})
+
+test('supports per-second V2 models with fixed resolutions and the shared 9/3/3 limits', () => {
+  const variants = [
+    ['video-v2-720P（按秒计费）', '720p', '480p'],
+    ['video-v2-480P（按秒计费）', '480p', '720p'],
+  ]
+  const images = Array.from({ length: 9 }, (_, index) => `https://example.com/${index}.jpg`)
+  const videos = Array.from({ length: 3 }, (_, index) => `https://example.com/${index}.mp4`)
+  const audios = Array.from({ length: 3 }, (_, index) => `https://example.com/${index}.mp3`)
+
+  for (const [model, resolution, invalidResolution] of variants) {
+    assert.equal(isVideoV2Model(model), true)
+    assert.equal(isVideoV2FixedResolutionModel(model), true)
+    assert.equal(getVideoV2DefaultResolution(model), resolution)
+    assert.equal(isValidVideoV2ResolutionForModel(resolution, model), true)
+    assert.equal(isValidVideoV2ResolutionForModel(invalidResolution, model), false)
+
+    const payload = buildVideoV2SubmitPayload({
+      model,
+      prompt: '使用所有参考素材',
+      images,
+      videos,
+      audios,
+      aspectRatio: '16:9',
+      duration: 15,
+      resolution,
+      generateAudio: true,
+    })
+    assert.equal(payload.model, model)
+    assert.equal(payload.resolution, resolution)
+    assert.equal(payload.images.length, 9)
+    assert.equal(payload.videos.length, 3)
+    assert.equal(payload.audios.length, 3)
+    assert.throws(() => buildVideoV2SubmitPayload({
+      model,
+      prompt: '错误分辨率',
+      images: [],
+      videos: [],
+      audios: [],
+      aspectRatio: '16:9',
+      duration: 5,
+      resolution: invalidResolution,
+      generateAudio: true,
+    }), /固定为/)
+  }
 })
 
 test('identifies video-v2-fast as the fast adapter alias without broadening the match', () => {

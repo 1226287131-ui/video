@@ -1,4 +1,4 @@
-import { getVideoV2MediaLimitsForModel, isValidVideoV2Duration, isVideoV2Model } from './v2Media.ts'
+import { getVideoV2MediaLimitsForModel, isValidVideoV2Duration, isValidVideoV2ResolutionForModel, isVideoV2Model } from './v2Media.ts'
 import {
   isMiniMaxH3VideoModel,
   isValidMiniMaxH3AspectRatio,
@@ -510,6 +510,9 @@ export function buildVideoV2SubmitPayload(input: VideoV2SubmitPayloadInput) {
   }
   if (!isValidVideoV2Duration(input.duration)) {
     throw new Error('video-v2 系列的 duration 必须是 5 到 15 之间的整数')
+  }
+  if (!isValidVideoV2ResolutionForModel(input.resolution, input.model)) {
+    throw new Error(`${input.model} 的 resolution 固定为 ${input.model.toLowerCase().includes('720p') ? '720p' : '480p'}`)
   }
   const mediaLimits = getVideoV2MediaLimitsForModel(input.model)
   if (input.images.length > mediaLimits.images) {
