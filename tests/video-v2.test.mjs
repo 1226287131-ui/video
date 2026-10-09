@@ -38,10 +38,11 @@ test('uses the special-price V2 media limits', () => {
   assert.deepEqual(getVideoV2MediaLimitsForModel('video-v2'), { images: 9, videos: 3, audios: 3 })
 })
 
-test('supports per-second V2 models with fixed resolutions and the shared 9/3/3 limits', () => {
+test('supports fixed-resolution V2 billing variants with the shared 9/3/3 limits', () => {
   const variants = [
     ['video-v2-720P（按秒计费）', '720p', '480p'],
     ['video-v2-480P（按秒计费）', '480p', '720p'],
+    ['video-v2-480P（按条计费）', '480p', '720p'],
   ]
   const images = Array.from({ length: 9 }, (_, index) => `https://example.com/${index}.jpg`)
   const videos = Array.from({ length: 3 }, (_, index) => `https://example.com/${index}.mp4`)

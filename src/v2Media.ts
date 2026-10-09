@@ -10,12 +10,14 @@ export const VIDEO_V2_FAST_MODEL = 'video-v2-fast' as const
 /** Additional special-price channel backed by the standard V2 request adapter. */
 export const VIDEO_V2_SPECIAL_PRICE_MODEL = 'video-v2-特价版' as const
 export const VIDEO_V2_SPECIAL_PRICE_MODELS = [VIDEO_V2_SPECIAL_PRICE_MODEL] as const
-/** Per-second channels backed by the standard V2 request adapter. */
+/** Fixed-resolution channels backed by the standard V2 request adapter. */
 export const VIDEO_V2_FIXED_720P_MODEL = 'video-v2-720P（按秒计费）' as const
 export const VIDEO_V2_FIXED_480P_MODEL = 'video-v2-480P（按秒计费）' as const
+export const VIDEO_V2_FIXED_480P_PER_ITEM_MODEL = 'video-v2-480P（按条计费）' as const
 export const VIDEO_V2_FIXED_RESOLUTION_MODELS = [
   VIDEO_V2_FIXED_720P_MODEL,
   VIDEO_V2_FIXED_480P_MODEL,
+  VIDEO_V2_FIXED_480P_PER_ITEM_MODEL,
 ] as const
 /** Additional low-price channel ids backed by the same V2 adapters. */
 export const VIDEO_V2_LOW_PRICE_MODEL = 'video-v2（限时低价渠道）' as const
@@ -94,7 +96,9 @@ export function isVideoV2Fixed720pModel(model: unknown) {
 }
 
 export function isVideoV2Fixed480pModel(model: unknown) {
-  return String(model || '').trim().toLowerCase() === VIDEO_V2_FIXED_480P_MODEL.toLowerCase()
+  const normalizedModel = String(model || '').trim().toLowerCase()
+  return normalizedModel === VIDEO_V2_FIXED_480P_MODEL.toLowerCase()
+    || normalizedModel === VIDEO_V2_FIXED_480P_PER_ITEM_MODEL.toLowerCase()
 }
 
 export function isVideoV2FixedResolutionModel(model: unknown) {
