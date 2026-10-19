@@ -3035,25 +3035,37 @@ function VideoStudioApp() {
   return (
     <main className="studio-shell">
       <section className="hero-band">
-        <div className="eyebrow">
-          <Sparkles size={14} />
-          Gen-Video Studio
+        <div className="studio-masthead">
+          <div className="studio-brand">
+            <span className="studio-brand-mark" aria-hidden="true"><Play size={18} fill="currentColor" /></span>
+            <span>Gen-Video <span className="studio-brand-light">Studio</span></span>
+          </div>
+          <span className="studio-edition">AI VIDEO WORKSPACE</span>
         </div>
-        <h1>构建你的光影视界</h1>
-        <p className="lede">输入镜头描述与运动轨迹，强大的云端架构即时为你生成电影级画面，完美适配各类画幅与模型引擎。</p>
-        <div className="status-row">
-          <span className={`status-pill status-${String(currentStatus).toLowerCase()}`}>
-            <LoaderCircle className={['processing', 'result_pending'].includes(String(currentStatus).toLowerCase()) ? 'spin' : ''} size={14} />
-            {currentLabel}
-          </span>
-          <span className="badge" role="status" aria-live="polite" aria-atomic="true">
-            <Terminal size={14} />
-            {message}
-          </span>
+        <div className="hero-intro">
+          <div>
+            <p className="studio-kicker">从想象，到影像</p>
+            <h1>让灵感，成为下一帧。</h1>
+            <p className="lede">写下画面，选择模型。你的下一部作品，从这里开始。</p>
+          </div>
+          <div className="status-row">
+            <span className={`status-pill status-${String(currentStatus).toLowerCase()}`}>
+              <LoaderCircle className={['processing', 'result_pending'].includes(String(currentStatus).toLowerCase()) ? 'spin' : ''} size={14} />
+              {currentLabel}
+            </span>
+            <span className="badge" role="status" aria-live="polite" aria-atomic="true">
+              <Terminal size={14} />
+              {message}
+            </span>
+          </div>
         </div>
       </section>
 
       <section className="workspace-grid">
+        <div className="workspace-heading">
+          <div><span className="studio-kicker">PREVIEW</span><h2>作品预览</h2></div>
+          <span className="workspace-heading-note"><Film size={14} aria-hidden="true" /> 你的专属放映室</span>
+        </div>
         <aside className="retention-notice" role="note">
           <Info size={18} aria-hidden="true" />
           <p><strong>温馨提示：</strong>平台不会永久保存数据，生成的视频仅保留 48 小时，请及时下载备份，逾期丢失概不负责。</p>
@@ -3137,19 +3149,21 @@ function VideoStudioApp() {
             </div>
           </div>
         ) : selectedTaskUsesProtectedContent && loadingGrokVideo ? (
-          <div className="player-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.04)' }}>
-            <div className="empty-state" style={{ border: 'none', background: 'transparent' }} role="status" aria-live="polite">
-              <LoaderCircle className="spin" size={42} style={{ opacity: 0.72, marginBottom: 16 }} />
-              <div style={{ fontSize: 20, color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>正在加载鉴权视频</div>
-              <p style={{ marginTop: 8, color: 'rgba(255,255,255,0.4)' }}>视频内容会临时保存在浏览器内存中，不写入服务器磁盘</p>
+          <div className="player-container player-container--empty">
+            <div className="stage-empty" role="status" aria-live="polite">
+              <span className="stage-symbol"><LoaderCircle className="spin" size={28} /></span>
+              <h3>正在加载视频</h3>
+              <p>视频会临时保存在浏览器内存中，请稍候。</p>
             </div>
           </div>
         ) : (
-          <div className="player-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.04)' }}>
-            <div className="empty-state" style={{ border: 'none', background: 'transparent' }}>
-              <Film size={54} style={{ opacity: 0.15, marginBottom: 16 }} />
-              <div style={{ fontSize: 20, color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>大幕将启</div>
-              <p style={{ marginTop: 8, color: 'rgba(255,255,255,0.4)' }}>配置密钥并输入描述，生成的画面将在此全景播放</p>
+          <div className="player-container player-container--empty">
+            <div className="stage-frames" aria-hidden="true"><i /><i /><i /></div>
+            <div className="stage-empty">
+              <span className="stage-symbol"><Play size={26} fill="currentColor" /></span>
+              <h3>好故事，值得被看见。</h3>
+              <p>在创作面板中输入描述，生成的作品将在这里播放。</p>
+              <span className="stage-caption">YOUR NEXT FRAME STARTS HERE</span>
             </div>
           </div>
         )}
@@ -3345,12 +3359,13 @@ function VideoStudioApp() {
 
       </section>
 
-      {/* 底部悬浮控制舱 */}
+      {/* 创作面板：桌面分栏，窄屏按正常文档流排列。 */}
       <div className={`floating-console ${consoleCollapsed ? 'is-collapsed' : ''}`}>
         <form className="console-form" onSubmit={handleSubmit}>
           <div className="console-header">
             <span className="console-title">
-              <Sparkles size={14} /> 生成控制
+              <span className="console-title-icon"><Sparkles size={18} /></span>
+              <span className="console-heading-copy"><strong>创作面板</strong><small>{form.model || '选择模型，开始创作'}</small></span>
             </span>
             <button
               type="button"
@@ -3780,7 +3795,7 @@ function VideoStudioApp() {
                   disabled={referenceControlsLocked}
                 >
                   {submitting ? <LoaderCircle className="spin" size={18} /> : <Play size={18} fill="currentColor" />}
-                  {submitting ? '调度中' : `开始构建 ×${generationCount}`}
+                  {submitting ? '提交中' : `生成视频 ×${generationCount}`}
                 </button>
                 <button 
                   type="button" 
