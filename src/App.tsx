@@ -3040,323 +3040,15 @@ function VideoStudioApp() {
             <span className="studio-brand-mark" aria-hidden="true"><Play size={18} fill="currentColor" /></span>
             <span>Gen-Video <span className="studio-brand-light">Studio</span></span>
           </div>
-          <span className="studio-edition">AI VIDEO WORKSPACE</span>
+          <span className="studio-edition">灵感 · 影像 · 创作</span>
         </div>
         <div className="hero-intro">
           <div>
-            <p className="studio-kicker">从想象，到影像</p>
-            <h1>让灵感，成为下一帧。</h1>
-            <p className="lede">写下画面，选择模型。你的下一部作品，从这里开始。</p>
+            <h1>视频创作</h1>
+            <p className="lede">把想法写成画面，从这里开始。</p>
           </div>
-          <div className="status-row">
-            <span className={`status-pill status-${String(currentStatus).toLowerCase()}`}>
-              <LoaderCircle className={['processing', 'result_pending'].includes(String(currentStatus).toLowerCase()) ? 'spin' : ''} size={14} />
-              {currentLabel}
-            </span>
-            <span className="badge" role="status" aria-live="polite" aria-atomic="true">
-              <Terminal size={14} />
-              {message}
-            </span>
-          </div>
+          <span className="workspace-context"><Film size={15} aria-hidden="true" /> AI 视频工作台</span>
         </div>
-      </section>
-
-      <section className="workspace-grid">
-        <div className="workspace-heading">
-          <div><span className="studio-kicker">PREVIEW</span><h2>作品预览</h2></div>
-          <span className="workspace-heading-note"><Film size={14} aria-hidden="true" /> 你的专属放映室</span>
-        </div>
-        <aside className="retention-notice" role="note">
-          <Info size={18} aria-hidden="true" />
-          <p><strong>温馨提示：</strong>平台不会永久保存数据，生成的视频仅保留 48 小时，请及时下载备份，逾期丢失概不负责。</p>
-        </aside>
-
-        {uncertainSubmissions.length > 0 && (
-          <aside className="submission-warning" role="alert">
-            <Info size={18} aria-hidden="true" />
-            <div className="submission-warning-content">
-              <strong>有 {uncertainSubmissions.length} 个提交请求状态未知</strong>
-              <p>服务端可能已经创建并计费，请勿直接重复提交。上游具体错误和幂等键如下：</p>
-              <div className="submission-warning-keys">
-                {uncertainSubmissions.map((item) => (
-                  <div key={item.idempotency_key} className="submission-warning-item">
-                    <span className="submission-warning-error">{item.error_message}</span>
-                    <code>批次 {item.batch_index} · {formatTaskDate(item.created_at)} · 幂等键：{item.idempotency_key}</code>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="submission-warning-actions">
-              <button
-                type="button"
-                onClick={() => void copyJson(uncertainSubmissions.map((item) => item.idempotency_key).join('\n'))}
-                aria-label="复制全部状态未知幂等键"
-                title="复制全部幂等键"
-              >
-                <Copy size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={clearUncertainSubmissions}
-                aria-label="清除已核对的状态未知记录"
-                title="核对完成后清除"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </aside>
-        )}
-        
-        {/* 沉浸式主舞台 */}
-        {resultHref ? (
-          <div className="player-container">
-            <video
-              key={resultHref}
-              className="player"
-              controls
-              playsInline
-              autoPlay
-              loop
-              preload="metadata"
-              {...({ referrerPolicy: 'no-referrer' } as Record<string, string>)}
-              onError={() => setMessage(selectedTaskUsesProtectedContent
-                ? '鉴权视频流加载失败，请检查 API Key 后重试'
-                : '视频流加载失败，请检查服务器的 /api/video-proxy 反代配置')}
-              src={resultHref}
-            />
-            <div className="player-meta" style={{ padding: '16px' }}>
-              <div className="mono result-url" style={{ fontSize: 13, opacity: 0.7 }}>
-                {selectedTaskUsesProtectedContent ? '鉴权视频流（仅当前浏览器会话可播放）' : resultHref}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '0 0 auto' }}>
-                <button
-                  type="button"
-                  className="ghost-btn"
-                  onClick={downloadVideo}
-                  disabled={downloading}
-                  aria-busy={downloading}
-                  title="下载视频"
-                >
-                  {downloading ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
-                  {downloading ? '准备中' : '下载视频'}
-                </button>
-                {!selectedTaskUsesProtectedContent && (
-                  <button type="button" className="ghost-btn" onClick={() => copyJson(resultHref)}>
-                    <Copy size={16} /> 复制链接
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : selectedTaskUsesProtectedContent && loadingGrokVideo ? (
-          <div className="player-container player-container--empty">
-            <div className="stage-empty" role="status" aria-live="polite">
-              <span className="stage-symbol"><LoaderCircle className="spin" size={28} /></span>
-              <h3>正在加载视频</h3>
-              <p>视频会临时保存在浏览器内存中，请稍候。</p>
-            </div>
-          </div>
-        ) : (
-          <div className="player-container player-container--empty">
-            <div className="stage-frames" aria-hidden="true"><i /><i /><i /></div>
-            <div className="stage-empty">
-              <span className="stage-symbol"><Play size={26} fill="currentColor" /></span>
-              <h3>好故事，值得被看见。</h3>
-              <p>在创作面板中输入描述，生成的作品将在这里播放。</p>
-              <span className="stage-caption">YOUR NEXT FRAME STARTS HERE</span>
-            </div>
-          </div>
-        )}
-
-        {/* 弱化的任务状态和历史展示 */}
-        {task && (
-          <div className="task-card">
-            <div className="task-topline">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span className={`status-pill status-${String(task.status).toLowerCase()}`} style={{ border: 'none', background: 'rgba(0,0,0,0.3)' }}>
-                  {task.progress}%
-                </span>
-                <span className="mono" style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>ID: {task.task_id}</span>
-                <span className="badge" style={{ border: 'none', background: 'rgba(255,255,255,0.05)' }}>{task.model}</span>
-              </div>
-              <button type="button" className="inline-btn" onClick={() => copyJson(task.task_id)}>
-                <Copy size={14} />
-              </button>
-            </div>
-
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${task.progress}%` }} />
-            </div>
-
-          </div>
-        )}
-
-        {history.length > 0 && (
-          <section className={`history-panel ${historyCollapsed ? 'is-collapsed' : ''}`} aria-labelledby="history-title">
-            <div className="history-panel-head">
-              <div>
-                <div className="history-title-row">
-                  <HistoryIcon size={18} />
-                  <h2 id="history-title">历史视频</h2>
-                  <span className="history-count">{history.length}</span>
-                </div>
-                <p>保留最近 {HISTORY_LIMIT} 条，记录只存于当前浏览器。</p>
-              </div>
-              <div className="history-header-actions">
-                <button
-                  type="button"
-                  className="history-clear-btn"
-                  onClick={clearHistory}
-                  disabled={submitting}
-                  title={submitting ? '仍有任务提交中，暂不可清空' : '清空历史记录'}
-                >
-                  <Trash2 size={15} /> 清空
-                </button>
-                <button
-                  type="button"
-                  className="history-collapse-btn"
-                  aria-expanded={!historyCollapsed}
-                  aria-controls="history-content"
-                  aria-label={historyCollapsed ? '展开历史记录' : '收起历史记录'}
-                  title={historyCollapsed ? '展开历史记录' : '收起历史记录'}
-                  onClick={toggleHistoryCollapsed}
-                >
-                  {historyCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-                </button>
-              </div>
-            </div>
-
-            <div id="history-content" className="history-content" hidden={historyCollapsed}>
-              <div className="history-toolbar">
-                <div className="history-search">
-                  <Search size={16} aria-hidden="true" />
-                  <input
-                    type="search"
-                    value={historyQuery}
-                    onChange={(event) => setHistoryQuery(event.target.value)}
-                    placeholder="搜索 Prompt、任务 ID 或模型"
-                    aria-label="搜索历史视频"
-                  />
-                  {historyQuery && (
-                    <button type="button" className="history-search-clear" onClick={() => setHistoryQuery('')} aria-label="清除搜索">
-                      <X size={15} />
-                    </button>
-                  )}
-                </div>
-                <div className="history-batch-actions">
-                  <label className="history-select-all">
-                    <input
-                      type="checkbox"
-                      checked={allDownloadableFilteredSelected}
-                      onChange={toggleAllFilteredHistory}
-                      disabled={batchDownloading || downloadableFilteredHistory.length === 0}
-                    />
-                    <span>全选可下载</span>
-                  </label>
-                  <button
-                    type="button"
-                    className="history-download-btn"
-                    onClick={downloadSelectedHistory}
-                    disabled={batchDownloading || downloading || selectedDownloadableHistory.length === 0}
-                    title={selectedDownloadableHistory.length > 0 ? `批量下载 ${selectedDownloadableHistory.length} 个视频` : '请选择已完成的视频'}
-                  >
-                    {batchDownloading ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}
-                    {batchDownloading ? `${batchDownloadProgress.completed}/${batchDownloadProgress.total}` : '批量下载'}
-                  </button>
-                </div>
-                <span className="history-result-count">{filteredHistory.length} 条结果{selectedDownloadableHistory.length > 0 ? ` · 已选 ${selectedDownloadableHistory.length}` : ''}</span>
-              </div>
-
-              {filteredHistory.length > 0 ? (
-                <div className="history-list">
-                  {filteredHistory.map((item) => {
-                    const isCurrent = item.task_id === task?.task_id
-                    const itemStatus = String(item.status).toLowerCase()
-                    const itemVideoHref = resolveVideoHref(item.result_url)
-                    const itemPreviewHref = resolveAssetHref(item.preview_url)
-                    const itemDownloadable = isHistoryTaskDownloadable(item)
-                    const itemSelected = selectedHistoryIds.has(item.task_id)
-                    return (
-                      <article key={item.task_id} className={`history-item ${isCurrent ? 'is-current' : ''} ${itemSelected ? 'is-selected' : ''}`}>
-                        <label className="history-item-select" aria-label={itemDownloadable ? `选择下载任务 ${item.task_id}` : `${statusLabel[item.status] ?? item.status}，不可下载`}>
-                          <input
-                            type="checkbox"
-                            checked={itemSelected}
-                            onChange={() => toggleHistorySelection(item.task_id)}
-                            disabled={!itemDownloadable || batchDownloading}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          className="history-item-main"
-                          onClick={() => selectHistoryItem(item)}
-                          aria-haspopup="dialog"
-                          aria-label={`查看任务详情，${statusLabel[item.status] ?? item.status}${item.batch_total && item.batch_total > 1 ? `，批次 ${item.batch_index}/${item.batch_total}` : ''}，任务 ${item.task_id}`}
-                        >
-                          <span className="history-item-preview" aria-hidden="true">
-                            <Film className="history-item-preview-fallback" size={18} />
-                            {itemPreviewHref ? (
-                              <img
-                                src={itemPreviewHref}
-                                alt=""
-                                loading="lazy"
-                                referrerPolicy="no-referrer"
-                                onError={(event) => { event.currentTarget.hidden = true }}
-                              />
-                            ) : itemVideoHref ? (
-                              <video
-                                src={itemVideoHref}
-                                muted
-                                playsInline
-                                preload="metadata"
-                                {...({ referrerPolicy: 'no-referrer' } as Record<string, string>)}
-                                onLoadedMetadata={(event) => {
-                                  if (Number.isFinite(event.currentTarget.duration) && event.currentTarget.duration > 0.1) {
-                                    event.currentTarget.currentTime = 0.1
-                                  }
-                                }}
-                                onError={(event) => { event.currentTarget.hidden = true }}
-                              />
-                            ) : null}
-                          </span>
-                          <span className="history-item-copy">
-                            <strong>{item.prompt || '未记录 Prompt 的视频任务'}</strong>
-                            <span className="history-item-meta">
-                              {formatTaskDate(item.created_at)} <span aria-hidden="true">·</span> {item.seconds ?? item.duration ?? '-'}s <span aria-hidden="true">·</span> {isMiniMaxH3VideoModel(item.model) ? item.size ?? '-' : item.ratio ?? '-'} <span aria-hidden="true">·</span> {isMiniMaxH3VideoModel(item.model) ? (item.audio === undefined ? '-' : item.audio ? '音频' : '无音频') : item.resolution ?? item.quality?.toUpperCase() ?? '-'}
-                              {item.batch_total && item.batch_total > 1 ? <> <span aria-hidden="true">·</span> 批次 {item.batch_index}/{item.batch_total}</> : null}
-                            </span>
-                            <span className="history-item-id mono">{isMiniMaxH3VideoModel(item.model) ? 'MiniMax-H3' : item.model} / {item.task_id}</span>
-                          </span>
-                        </button>
-                        <div className="history-item-actions">
-                          <span className={`history-status status-${itemStatus}`}>{statusLabel[item.status] ?? item.status}</span>
-                          <button type="button" className="inline-btn" onClick={() => reuseHistoryPrompt(item)} aria-label="复用这条 Prompt" title="复用 Prompt">
-                            <Sparkles size={15} />
-                          </button>
-                          <button type="button" className="inline-btn" onClick={() => copyJson(item.task_id)} aria-label="复制任务 ID" title="复制任务 ID">
-                            <Copy size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            className="inline-btn danger-btn"
-                            onClick={() => removeHistoryItem(item.task_id)}
-                            aria-label="删除历史记录"
-                            title="删除历史记录"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </article>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div className="history-empty">没有匹配的历史视频</div>
-              )}
-            </div>
-          </section>
-        )}
-
       </section>
 
       {/* 创作面板：桌面分栏，窄屏按正常文档流排列。 */}
@@ -3365,7 +3057,7 @@ function VideoStudioApp() {
           <div className="console-header">
             <span className="console-title">
               <span className="console-title-icon"><Sparkles size={18} /></span>
-              <span className="console-heading-copy"><strong>创作面板</strong><small>{form.model || '选择模型，开始创作'}</small></span>
+              <span className="console-heading-copy"><strong>创作设置</strong><small>选择模型，描述你的画面</small></span>
             </span>
             <button
               type="button"
@@ -3380,6 +3072,49 @@ function VideoStudioApp() {
           </div>
 
           <div className="console-collapsible">
+            <div className="model-connection">
+                  <div className="field settings-field">
+                    <label className="options-group-label" htmlFor="video-model">
+                      <Cpu size={14} /> 视频模型
+                      {loadingModels && <LoaderCircle className="spin" size={12} style={{ marginLeft: 6, opacity: 0.5 }}/>}
+                    </label>
+                    {models.length > 0 ? (
+                       <select
+                          id="video-model"
+                          className="model-select"
+                          value={form.model}
+                         onChange={(e) => changeModel(e.target.value)}
+                       >
+                         {models.map(m => (
+                           <option key={m.id} value={m.id}>{isMiniMaxH3VideoModel(m.id) ? 'MiniMax-H3' : m.id}</option>
+                         ))}
+                       </select>
+                    ) : (
+                       <input
+                        id="video-model"
+                        type="text"
+                        value={form.model}
+                        onChange={(e) => changeModel(e.target.value)}
+                        placeholder="填入API Key自动拉取，或手动指定模型"
+                      />
+                    )}
+                  </div>
+              <details className="connection-details">
+                <summary><KeyRound size={14} aria-hidden="true" /> API 连接 <span>{apiKey ? '已配置' : '填写 API Key'}</span><ChevronDown size={14} aria-hidden="true" /></summary>
+                  <div className="field settings-field">
+                    <label className="options-group-label" htmlFor="base-api-key">
+                      <KeyRound size={14} /> Base API Key
+                    </label>
+                    <input
+                      id="base-api-key"
+                      type="password"
+                      placeholder="sk-..."
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                    />
+                  </div>
+              </details>
+            </div>
             <div className="mode-toolbar" role="group" aria-label="生成模式">
               <span className="options-group-label">
                 <Sparkles size={14} /> 生成模式
@@ -3404,6 +3139,102 @@ function VideoStudioApp() {
                   <ImageIcon size={14} /> {mediaResourceModelSelected ? '参考素材' : '图生视频'}
                 </button>
               </div>
+            </div>
+
+            {/* 输入主区域 */}
+            <div className={`console-main-row prompt-row ${promptExpanded ? 'is-expanded' : ''}`}>
+              <div className="field prompt-field">
+                <div
+                  className={`prompt-editor ${draggingPromptFile ? 'is-file-dragging' : ''}`}
+                  onDragEnter={handlePromptDragEnter}
+                  onDragOver={handlePromptDragOver}
+                  onDragLeave={handlePromptDragLeave}
+                  onDrop={handlePromptDrop}
+                >
+                  <input
+                    ref={promptFileInputRef}
+                    className="prompt-file-input"
+                    type="file"
+                    accept=".json,.md,.markdown,application/json,text/markdown"
+                    aria-label="选择 JSON 或 Markdown Prompt 文件"
+                    onChange={(event) => {
+                      void handlePromptFiles(event.target.files)
+                      event.target.value = ''
+                    }}
+                  />
+                  <div className="prompt-editor-toolbar">
+                    <label className="prompt-visible-label" htmlFor="video-prompt">画面描述</label>
+                    <button
+                      type="button"
+                      className="prompt-expand-btn"
+                      onClick={() => setPromptExpanded((value) => !value)}
+                      aria-pressed={promptExpanded}
+                      aria-label={promptExpanded ? '收起提示词框' : '放大提示词框'}
+                      title={promptExpanded ? '收起提示词框' : '放大提示词框'}
+                    >
+                      {promptExpanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+                    </button>
+                    <button
+                      type="button"
+                      className="prompt-file-import-btn"
+                      onClick={() => promptFileInputRef.current?.click()}
+                      disabled={importingPromptFile}
+                      aria-label="从 JSON 或 Markdown 导入 Prompt"
+                      title="从 JSON 或 Markdown 导入 Prompt"
+                    >
+                      {importingPromptFile ? <LoaderCircle className="spin" size={17} /> : <FileText size={17} />}
+                    </button>
+                  </div>
+                {draggingPromptFile && (
+                  <div className="prompt-file-drop-overlay" role="status" aria-live="polite">
+                    <FileText size={20} aria-hidden="true" />
+                    <span>松开导入 JSON / Markdown</span>
+                  </div>
+                )}
+                <textarea
+                  ref={promptRef}
+                  id="video-prompt"
+                  value={form.prompt}
+                  onChange={handlePromptChange}
+                  onClick={handlePromptCursorChange}
+                  onSelect={handlePromptCursorChange}
+                  onKeyDown={handlePromptKeyDown}
+                  onBlur={() => setActiveMention(null)}
+                  placeholder="描述你要生成的视频画面（例如：光晕掠过湿润的赛博朋克街道，镜头平稳推进，雨水从黑色风衣滴落...）"
+                  aria-label="视频生成 Prompt"
+                  aria-describedby="prompt-file-import-hint"
+                  aria-busy={importingPromptFile}
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={mentionMenuOpen}
+                  aria-controls={mentionMenuOpen ? 'reference-mention-options' : undefined}
+                  aria-activedescendant={mentionMenuOpen ? `reference-mention-option-${mentionOptions[activeMentionIndex]?.number ?? mentionOptions[0]?.number}` : undefined}
+                  required={videoResourceModelSelected || grokModelSelected || miniMaxModelSelected || !legacyReferenceInputPresent}
+                />
+                  <span id="prompt-file-import-hint" className="sr-only">支持导入 JSON 或 Markdown 文件内容并插入当前 Prompt。</span>
+                  {mentionMenuOpen && (
+                    <div id="reference-mention-options" className="reference-mention-menu" role="listbox" aria-label="选择参考图">
+                      {mentionOptions.map((item, index) => (
+                        <button
+                          key={item.key}
+                          id={`reference-mention-option-${item.number}`}
+                          type="button"
+                          role="option"
+                          aria-selected={index === activeMentionIndex}
+                          className={index === activeMentionIndex ? 'is-active' : ''}
+                          onPointerDown={(event) => event.preventDefault()}
+                          onClick={() => insertReferenceMention(item.number)}
+                        >
+                          <img src={item.url} alt="" aria-hidden="true" />
+                          <span><strong>@参考图{item.number}</strong><small>REFERENCE_{item.number - 1}</small></span>
+                          <AtSign size={16} aria-hidden="true" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
 
             {mode === 'image' && (mediaResourceModelSelected ? (
@@ -3657,158 +3488,16 @@ function VideoStudioApp() {
               </div>
             ))}
 
-            {/* 输入主区域 */}
-            <div className={`console-main-row prompt-row ${promptExpanded ? 'is-expanded' : ''}`}>
-              <div className="field prompt-field">
-                <div
-                  className={`prompt-editor ${draggingPromptFile ? 'is-file-dragging' : ''}`}
-                  onDragEnter={handlePromptDragEnter}
-                  onDragOver={handlePromptDragOver}
-                  onDragLeave={handlePromptDragLeave}
-                  onDrop={handlePromptDrop}
-                >
-                  <input
-                    ref={promptFileInputRef}
-                    className="prompt-file-input"
-                    type="file"
-                    accept=".json,.md,.markdown,application/json,text/markdown"
-                    aria-label="选择 JSON 或 Markdown Prompt 文件"
-                    onChange={(event) => {
-                      void handlePromptFiles(event.target.files)
-                      event.target.value = ''
-                    }}
-                  />
-                  <div className="prompt-editor-toolbar">
-                    <button
-                      type="button"
-                      className="prompt-expand-btn"
-                      onClick={() => setPromptExpanded((value) => !value)}
-                      aria-pressed={promptExpanded}
-                      aria-label={promptExpanded ? '收起提示词框' : '放大提示词框'}
-                      title={promptExpanded ? '收起提示词框' : '放大提示词框'}
-                    >
-                      {promptExpanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
-                    </button>
-                    <button
-                      type="button"
-                      className="prompt-file-import-btn"
-                      onClick={() => promptFileInputRef.current?.click()}
-                      disabled={importingPromptFile}
-                      aria-label="从 JSON 或 Markdown 导入 Prompt"
-                      title="从 JSON 或 Markdown 导入 Prompt"
-                    >
-                      {importingPromptFile ? <LoaderCircle className="spin" size={17} /> : <FileText size={17} />}
-                    </button>
-                  </div>
-                {draggingPromptFile && (
-                  <div className="prompt-file-drop-overlay" role="status" aria-live="polite">
-                    <FileText size={20} aria-hidden="true" />
-                    <span>松开导入 JSON / Markdown</span>
-                  </div>
-                )}
-                <textarea
-                  ref={promptRef}
-                  id="video-prompt"
-                  value={form.prompt}
-                  onChange={handlePromptChange}
-                  onClick={handlePromptCursorChange}
-                  onSelect={handlePromptCursorChange}
-                  onKeyDown={handlePromptKeyDown}
-                  onBlur={() => setActiveMention(null)}
-                  placeholder="描述你要生成的视频画面（例如：光晕掠过湿润的赛博朋克街道，镜头平稳推进，雨水从黑色风衣滴落...）"
-                  aria-label="视频生成 Prompt"
-                  aria-describedby="prompt-file-import-hint"
-                  aria-busy={importingPromptFile}
-                  role="combobox"
-                  aria-autocomplete="list"
-                  aria-expanded={mentionMenuOpen}
-                  aria-controls={mentionMenuOpen ? 'reference-mention-options' : undefined}
-                  aria-activedescendant={mentionMenuOpen ? `reference-mention-option-${mentionOptions[activeMentionIndex]?.number ?? mentionOptions[0]?.number}` : undefined}
-                  required={videoResourceModelSelected || grokModelSelected || miniMaxModelSelected || !legacyReferenceInputPresent}
-                />
-                  <span id="prompt-file-import-hint" className="sr-only">支持导入 JSON 或 Markdown 文件内容并插入当前 Prompt。</span>
-                  {mentionMenuOpen && (
-                    <div id="reference-mention-options" className="reference-mention-menu" role="listbox" aria-label="选择参考图">
-                      {mentionOptions.map((item, index) => (
-                        <button
-                          key={item.key}
-                          id={`reference-mention-option-${item.number}`}
-                          type="button"
-                          role="option"
-                          aria-selected={index === activeMentionIndex}
-                          className={index === activeMentionIndex ? 'is-active' : ''}
-                          onPointerDown={(event) => event.preventDefault()}
-                          onClick={() => insertReferenceMention(item.number)}
-                        >
-                          <img src={item.url} alt="" aria-hidden="true" />
-                          <span><strong>@参考图{item.number}</strong><small>REFERENCE_{item.number - 1}</small></span>
-                          <AtSign size={16} aria-hidden="true" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="console-actions">
-                <label className="generation-count-control">
-                  <span>生成次数</span>
-                  <span className="generation-stepper">
-                    <button
-                      type="button"
-                      onClick={() => setGenerationCount((count) => Math.max(MIN_GENERATION_COUNT, count - 1))}
-                      disabled={submitting || generationCount <= MIN_GENERATION_COUNT}
-                      aria-label="减少生成次数"
-                      title="减少生成次数"
-                    >
-                      <Minus size={15} />
-                    </button>
-                    <input
-                      type="number"
-                      min={MIN_GENERATION_COUNT}
-                      max={MAX_GENERATION_COUNT}
-                      step="1"
-                      inputMode="numeric"
-                      value={generationCount}
-                      onChange={(event) => {
-                        const nextCount = Number(event.target.value)
-                        if (Number.isFinite(nextCount)) {
-                          setGenerationCount(Math.min(MAX_GENERATION_COUNT, Math.max(MIN_GENERATION_COUNT, Math.trunc(nextCount))))
-                        }
-                      }}
-                      disabled={submitting}
-                      aria-label="生成次数"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setGenerationCount((count) => Math.min(MAX_GENERATION_COUNT, count + 1))}
-                      disabled={submitting || generationCount >= MAX_GENERATION_COUNT}
-                      aria-label="增加生成次数"
-                      title="增加生成次数"
-                    >
-                      <Plus size={15} />
-                    </button>
-                  </span>
-                </label>
-                <button 
-                  type="submit" 
-                  className="primary-btn" 
-                  disabled={referenceControlsLocked}
-                >
-                  {submitting ? <LoaderCircle className="spin" size={18} /> : <Play size={18} fill="currentColor" />}
-                  {submitting ? '提交中' : `生成视频 ×${generationCount}`}
-                </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="secondary-btn console-settings-toggle"
                   onClick={() => setShowSettings(!showSettings)}
                   aria-expanded={showSettings}
                   aria-controls="generation-settings"
                 >
                   <Settings2 size={16} /> 
-                  {showSettings ? '收起配置' : '展开配置'}
+                  <span>生成参数</span><small>{showSettings ? '收起' : '展开'}</small><ChevronDown size={15} className={showSettings ? 'is-open' : ''} />
                 </button>
-              </div>
-            </div>
 
             {/* 展开的选项与配置区域 */}
             {showSettings && (
@@ -3816,53 +3505,6 @@ function VideoStudioApp() {
                 <div className="settings-panel-heading">
                   <span className="settings-panel-title"><Settings2 size={16} /> 请求配置</span>
                 </div>
-
-                <section className="settings-section settings-section--connection" aria-labelledby="connection-settings-title">
-                  <header className="settings-section-header">
-                    <h3 id="connection-settings-title" className="settings-section-title"><KeyRound size={15} /> 接入与模型</h3>
-                  </header>
-                  <div className="settings-section-grid settings-section-grid--connection">
-                  <div className="field settings-field">
-                    <label className="options-group-label" htmlFor="base-api-key">
-                      <KeyRound size={14} /> Base API Key
-                    </label>
-                    <input
-                      id="base-api-key"
-                      type="password"
-                      placeholder="sk-..."
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="field settings-field">
-                    <label className="options-group-label" htmlFor="video-model">
-                      <Cpu size={14} /> 视频生成引擎
-                      {loadingModels && <LoaderCircle className="spin" size={12} style={{ marginLeft: 6, opacity: 0.5 }}/>}
-                    </label>
-                    {models.length > 0 ? (
-                       <select 
-                          id="video-model"
-                          className="model-select"
-                          value={form.model}
-                         onChange={(e) => changeModel(e.target.value)}
-                       >
-                         {models.map(m => (
-                           <option key={m.id} value={m.id}>{isMiniMaxH3VideoModel(m.id) ? 'MiniMax-H3' : m.id}</option>
-                         ))}
-                       </select>
-                    ) : (
-                       <input
-                        id="video-model"
-                        type="text"
-                        value={form.model}
-                        onChange={(e) => changeModel(e.target.value)}
-                        placeholder="填入API Key自动拉取，或手动指定模型"
-                      />
-                    )}
-                  </div>
-                  </div>
-                </section>
 
                 <section className={`settings-section settings-section--base ${miniMaxModelSelected ? 'settings-section--minimax' : ''}`} aria-labelledby="base-generation-settings-title">
                   <header className="settings-section-header">
@@ -4088,9 +3730,364 @@ function VideoStudioApp() {
 
               </section>
             )}
+              <div className="console-actions">
+                <label className="generation-count-control">
+                  <span>生成次数</span>
+                  <span className="generation-stepper">
+                    <button
+                      type="button"
+                      onClick={() => setGenerationCount((count) => Math.max(MIN_GENERATION_COUNT, count - 1))}
+                      disabled={submitting || generationCount <= MIN_GENERATION_COUNT}
+                      aria-label="减少生成次数"
+                      title="减少生成次数"
+                    >
+                      <Minus size={15} />
+                    </button>
+                    <input
+                      type="number"
+                      min={MIN_GENERATION_COUNT}
+                      max={MAX_GENERATION_COUNT}
+                      step="1"
+                      inputMode="numeric"
+                      value={generationCount}
+                      onChange={(event) => {
+                        const nextCount = Number(event.target.value)
+                        if (Number.isFinite(nextCount)) {
+                          setGenerationCount(Math.min(MAX_GENERATION_COUNT, Math.max(MIN_GENERATION_COUNT, Math.trunc(nextCount))))
+                        }
+                      }}
+                      disabled={submitting}
+                      aria-label="生成次数"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setGenerationCount((count) => Math.min(MAX_GENERATION_COUNT, count + 1))}
+                      disabled={submitting || generationCount >= MAX_GENERATION_COUNT}
+                      aria-label="增加生成次数"
+                      title="增加生成次数"
+                    >
+                      <Plus size={15} />
+                    </button>
+                  </span>
+                </label>
+                <button
+                  type="submit"
+                  className="primary-btn"
+                  disabled={referenceControlsLocked}
+                >
+                  {submitting ? <LoaderCircle className="spin" size={18} /> : <Play size={18} fill="currentColor" />}
+                  {submitting ? '提交中' : `生成视频 ×${generationCount}`}
+                </button>
+
+              </div>
           </div>
         </form>
       </div>
+
+      <section className="workspace-grid">
+        <div className="workspace-heading">
+          <span className="console-title">
+            <span className="console-title-icon"><Film size={18} /></span>
+            <span className="console-heading-copy"><strong>作品预览</strong><small>播放、查看与下载生成结果</small></span>
+          </span>
+          <span className={`status-pill status-${String(currentStatus).toLowerCase()}`}>
+            <LoaderCircle className={['processing', 'result_pending'].includes(String(currentStatus).toLowerCase()) ? 'spin' : ''} size={14} />
+            {currentLabel}
+          </span>
+        </div>
+        <div className="workspace-message" role="status" aria-live="polite" aria-atomic="true">
+          <Info size={15} aria-hidden="true" />
+          <span>{message}</span>
+        </div>
+        <aside className="retention-notice" role="note">
+          <Info size={18} aria-hidden="true" />
+          <p><strong>温馨提示：</strong>平台不会永久保存数据，生成的视频仅保留 48 小时，请及时下载备份，逾期丢失概不负责。</p>
+        </aside>
+
+        {uncertainSubmissions.length > 0 && (
+          <aside className="submission-warning" role="alert">
+            <Info size={18} aria-hidden="true" />
+            <div className="submission-warning-content">
+              <strong>有 {uncertainSubmissions.length} 个提交请求状态未知</strong>
+              <p>服务端可能已经创建并计费，请勿直接重复提交。上游具体错误和幂等键如下：</p>
+              <div className="submission-warning-keys">
+                {uncertainSubmissions.map((item) => (
+                  <div key={item.idempotency_key} className="submission-warning-item">
+                    <span className="submission-warning-error">{item.error_message}</span>
+                    <code>批次 {item.batch_index} · {formatTaskDate(item.created_at)} · 幂等键：{item.idempotency_key}</code>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="submission-warning-actions">
+              <button
+                type="button"
+                onClick={() => void copyJson(uncertainSubmissions.map((item) => item.idempotency_key).join('\n'))}
+                aria-label="复制全部状态未知幂等键"
+                title="复制全部幂等键"
+              >
+                <Copy size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={clearUncertainSubmissions}
+                aria-label="清除已核对的状态未知记录"
+                title="核对完成后清除"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </aside>
+        )}
+        {/* 沉浸式主舞台 */}
+        {resultHref ? (
+          <div className="player-container">
+            <video
+              key={resultHref}
+              className="player"
+              controls
+              playsInline
+              autoPlay
+              loop
+              preload="metadata"
+              {...({ referrerPolicy: 'no-referrer' } as Record<string, string>)}
+              onError={() => setMessage(selectedTaskUsesProtectedContent
+                ? '鉴权视频流加载失败，请检查 API Key 后重试'
+                : '视频流加载失败，请检查服务器的 /api/video-proxy 反代配置')}
+              src={resultHref}
+            />
+            <div className="player-meta" style={{ padding: '16px' }}>
+              <div className="mono result-url" style={{ fontSize: 13, opacity: 0.7 }}>
+                {selectedTaskUsesProtectedContent ? '鉴权视频流（仅当前浏览器会话可播放）' : resultHref}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '0 0 auto' }}>
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  onClick={downloadVideo}
+                  disabled={downloading}
+                  aria-busy={downloading}
+                  title="下载视频"
+                >
+                  {downloading ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
+                  {downloading ? '准备中' : '下载视频'}
+                </button>
+                {!selectedTaskUsesProtectedContent && (
+                  <button type="button" className="ghost-btn" onClick={() => copyJson(resultHref)}>
+                    <Copy size={16} /> 复制链接
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : selectedTaskUsesProtectedContent && loadingGrokVideo ? (
+          <div className="player-container player-container--empty">
+            <div className="stage-empty" role="status" aria-live="polite">
+              <span className="stage-symbol"><LoaderCircle className="spin" size={28} /></span>
+              <h3>正在加载视频</h3>
+              <p>视频会临时保存在浏览器内存中，请稍候。</p>
+            </div>
+          </div>
+        ) : (
+          <div className="player-container player-container--empty">
+            <div className="stage-empty">
+              <span className="stage-symbol"><Play size={26} fill="currentColor" /></span>
+              <h3>下一帧，由你创作</h3>
+              <p>选择模型，写下画面描述<br />生成的视频将在这里呈现</p>
+            </div>
+          </div>
+        )}
+
+        {/* 弱化的任务状态和历史展示 */}
+        {task && (
+          <div className="task-card">
+            <div className="task-topline">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span className={`status-pill status-${String(task.status).toLowerCase()}`}>
+                  {task.progress}%
+                </span>
+                <span className="mono task-id">ID: {task.task_id}</span>
+                <span className="badge">{task.model}</span>
+              </div>
+              <button type="button" className="inline-btn" onClick={() => copyJson(task.task_id)}>
+                <Copy size={14} />
+              </button>
+            </div>
+
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${task.progress}%` }} />
+            </div>
+
+          </div>
+        )}
+
+        {history.length > 0 && (
+          <section className={`history-panel ${historyCollapsed ? 'is-collapsed' : ''}`} aria-labelledby="history-title">
+            <div className="history-panel-head">
+              <div>
+                <div className="history-title-row">
+                  <HistoryIcon size={18} />
+                  <h2 id="history-title">历史视频</h2>
+                  <span className="history-count">{history.length}</span>
+                </div>
+                <p>保留最近 {HISTORY_LIMIT} 条，记录只存于当前浏览器。</p>
+              </div>
+              <div className="history-header-actions">
+                <button
+                  type="button"
+                  className="history-clear-btn"
+                  onClick={clearHistory}
+                  disabled={submitting}
+                  title={submitting ? '仍有任务提交中，暂不可清空' : '清空历史记录'}
+                >
+                  <Trash2 size={15} /> 清空
+                </button>
+                <button
+                  type="button"
+                  className="history-collapse-btn"
+                  aria-expanded={!historyCollapsed}
+                  aria-controls="history-content"
+                  aria-label={historyCollapsed ? '展开历史记录' : '收起历史记录'}
+                  title={historyCollapsed ? '展开历史记录' : '收起历史记录'}
+                  onClick={toggleHistoryCollapsed}
+                >
+                  {historyCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div id="history-content" className="history-content" hidden={historyCollapsed}>
+              <div className="history-toolbar">
+                <div className="history-search">
+                  <Search size={16} aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={historyQuery}
+                    onChange={(event) => setHistoryQuery(event.target.value)}
+                    placeholder="搜索 Prompt、任务 ID 或模型"
+                    aria-label="搜索历史视频"
+                  />
+                  {historyQuery && (
+                    <button type="button" className="history-search-clear" onClick={() => setHistoryQuery('')} aria-label="清除搜索">
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
+                <div className="history-batch-actions">
+                  <label className="history-select-all">
+                    <input
+                      type="checkbox"
+                      checked={allDownloadableFilteredSelected}
+                      onChange={toggleAllFilteredHistory}
+                      disabled={batchDownloading || downloadableFilteredHistory.length === 0}
+                    />
+                    <span>全选可下载</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="history-download-btn"
+                    onClick={downloadSelectedHistory}
+                    disabled={batchDownloading || downloading || selectedDownloadableHistory.length === 0}
+                    title={selectedDownloadableHistory.length > 0 ? `批量下载 ${selectedDownloadableHistory.length} 个视频` : '请选择已完成的视频'}
+                  >
+                    {batchDownloading ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}
+                    {batchDownloading ? `${batchDownloadProgress.completed}/${batchDownloadProgress.total}` : '批量下载'}
+                  </button>
+                </div>
+                <span className="history-result-count">{filteredHistory.length} 条结果{selectedDownloadableHistory.length > 0 ? ` · 已选 ${selectedDownloadableHistory.length}` : ''}</span>
+              </div>
+
+              {filteredHistory.length > 0 ? (
+                <div className="history-list">
+                  {filteredHistory.map((item) => {
+                    const isCurrent = item.task_id === task?.task_id
+                    const itemStatus = String(item.status).toLowerCase()
+                    const itemVideoHref = resolveVideoHref(item.result_url)
+                    const itemPreviewHref = resolveAssetHref(item.preview_url)
+                    const itemDownloadable = isHistoryTaskDownloadable(item)
+                    const itemSelected = selectedHistoryIds.has(item.task_id)
+                    return (
+                      <article key={item.task_id} className={`history-item ${isCurrent ? 'is-current' : ''} ${itemSelected ? 'is-selected' : ''}`}>
+                        <label className="history-item-select" aria-label={itemDownloadable ? `选择下载任务 ${item.task_id}` : `${statusLabel[item.status] ?? item.status}，不可下载`}>
+                          <input
+                            type="checkbox"
+                            checked={itemSelected}
+                            onChange={() => toggleHistorySelection(item.task_id)}
+                            disabled={!itemDownloadable || batchDownloading}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="history-item-main"
+                          onClick={() => selectHistoryItem(item)}
+                          aria-haspopup="dialog"
+                          aria-label={`查看任务详情，${statusLabel[item.status] ?? item.status}${item.batch_total && item.batch_total > 1 ? `，批次 ${item.batch_index}/${item.batch_total}` : ''}，任务 ${item.task_id}`}
+                        >
+                          <span className="history-item-preview" aria-hidden="true">
+                            <Film className="history-item-preview-fallback" size={18} />
+                            {itemPreviewHref ? (
+                              <img
+                                src={itemPreviewHref}
+                                alt=""
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                                onError={(event) => { event.currentTarget.hidden = true }}
+                              />
+                            ) : itemVideoHref ? (
+                              <video
+                                src={itemVideoHref}
+                                muted
+                                playsInline
+                                preload="metadata"
+                                {...({ referrerPolicy: 'no-referrer' } as Record<string, string>)}
+                                onLoadedMetadata={(event) => {
+                                  if (Number.isFinite(event.currentTarget.duration) && event.currentTarget.duration > 0.1) {
+                                    event.currentTarget.currentTime = 0.1
+                                  }
+                                }}
+                                onError={(event) => { event.currentTarget.hidden = true }}
+                              />
+                            ) : null}
+                          </span>
+                          <span className="history-item-copy">
+                            <strong>{item.prompt || '未记录 Prompt 的视频任务'}</strong>
+                            <span className="history-item-meta">
+                              {formatTaskDate(item.created_at)} <span aria-hidden="true">·</span> {item.seconds ?? item.duration ?? '-'}s <span aria-hidden="true">·</span> {isMiniMaxH3VideoModel(item.model) ? item.size ?? '-' : item.ratio ?? '-'} <span aria-hidden="true">·</span> {isMiniMaxH3VideoModel(item.model) ? (item.audio === undefined ? '-' : item.audio ? '音频' : '无音频') : item.resolution ?? item.quality?.toUpperCase() ?? '-'}
+                              {item.batch_total && item.batch_total > 1 ? <> <span aria-hidden="true">·</span> 批次 {item.batch_index}/{item.batch_total}</> : null}
+                            </span>
+                            <span className="history-item-id mono">{isMiniMaxH3VideoModel(item.model) ? 'MiniMax-H3' : item.model} / {item.task_id}</span>
+                          </span>
+                        </button>
+                        <div className="history-item-actions">
+                          <span className={`history-status status-${itemStatus}`}>{statusLabel[item.status] ?? item.status}</span>
+                          <button type="button" className="inline-btn" onClick={() => reuseHistoryPrompt(item)} aria-label="复用这条 Prompt" title="复用 Prompt">
+                            <Sparkles size={15} />
+                          </button>
+                          <button type="button" className="inline-btn" onClick={() => copyJson(item.task_id)} aria-label="复制任务 ID" title="复制任务 ID">
+                            <Copy size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-btn danger-btn"
+                            onClick={() => removeHistoryItem(item.task_id)}
+                            aria-label="删除历史记录"
+                            title="删除历史记录"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="history-empty">没有匹配的历史视频</div>
+              )}
+            </div>
+          </section>
+        )}
+
+      </section>
 
       <dialog
         ref={detailDialogRef}
