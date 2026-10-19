@@ -105,7 +105,6 @@ import {
   VIDEO_V3_RATIOS,
   getVideoV3DefaultResolution,
   getVideoV3MediaLimitsForModel,
-  isVideoV3SpecialPriceModel,
   type VideoV3Protocol,
 } from './videoV3'
 import {
@@ -775,7 +774,6 @@ function VideoStudioApp() {
   const miniMaxModelSelected = isMiniMaxH3VideoModel(form.model)
   const grokModelSelected = isGrokImagineVideoModel(form.model)
   const videoV3ModelSelected = isVideoV3Model(form.model)
-  const videoV3SpecialPriceModelSelected = isVideoV3SpecialPriceModel(form.model)
   const videoV2ModelSelected = isVideoV2Model(form.model)
   const videoV2SpecialPriceModelSelected = isVideoV2SpecialPriceModel(form.model)
   const videoResourceModelSelected = videoV2ModelSelected || videoV3ModelSelected
@@ -1190,14 +1188,7 @@ function VideoStudioApp() {
       }))
       setImageInputMode('multiple')
       setImageSourceMode('upload')
-      if (isVideoV3SpecialPriceModel(nextModel)) {
-        setUploadedAudios([])
-        setUploadedVideoAudios([])
-        setUploadedVideos([])
-      }
-      setMessage(isVideoV3SpecialPriceModel(nextModel)
-        ? `${nextModel} 使用 video-v3 原协议：4-30 秒、最多 9 张参考图，不支持参考视频和参考音频`
-        : `${nextModel} 使用 video-v3 原协议：4-30 秒、${getVideoV3DefaultResolution(nextModel, 'legacy')}`)
+      setMessage(`${nextModel} 使用 video-v3 原协议：4-30 秒、${getVideoV3DefaultResolution(nextModel, 'legacy')}`)
       return
     }
 
@@ -3407,20 +3398,16 @@ function VideoStudioApp() {
                     <strong>参考素材</strong>
                     <span>提交时会以公网外链发送给当前模型的 JSON 协议</span>
                   </div>
-                  <span className="badge">{videoV2MediaLimits.images} 图 · {videoV3SpecialPriceModelSelected ? '不支持视频 · 不支持音频' : `${videoV2MediaLimits.videos} 视频 · ${videoV2MediaLimits.audios} 音频`}</span>
+                  <span className="badge">{videoV2MediaLimits.images} 图 · {videoV2MediaLimits.videos} 视频 · {videoV2MediaLimits.audios} 音频</span>
                 </div>
                 <div className="video-v2-media-grid">
-                  {(['image', 'video', 'audio'] as V2MediaKind[])
-                    .filter((kind) => !videoV3SpecialPriceModelSelected || kind === 'image')
-                    .map(renderVideoV2MediaSection)}
+                  {(['image', 'video', 'audio'] as V2MediaKind[]).map(renderVideoV2MediaSection)}
                 </div>
                 <div className="field-hint">
                   {miniMaxModelSelected
                     ? 'MiniMax-H3 会按 images、reference_videos、reference_audios 字段提交；可点击每个素材旁的 @ 按钮，把 @参考图、@参考视频 或 @参考音频写入 Prompt。'
                     : videoV3ModelSelected
-                    ? videoV3SpecialPriceModelSelected
-                      ? 'video-v3-特价版最多支持 9 张参考图，不支持参考视频和参考音频。'
-                      : `${form.model} 使用 video-v3 参数：4-30 秒、${videoV2MediaLimits.images} 图、${videoV2MediaLimits.videos} 视频、${videoV2MediaLimits.audios} 音频，固定 ${getVideoV3DefaultResolution(form.model, 'legacy')}。`
+                    ? `${form.model} 使用 video-v3 参数：4-30 秒、${videoV2MediaLimits.images} 图、${videoV2MediaLimits.videos} 视频、${videoV2MediaLimits.audios} 音频，固定 ${getVideoV3DefaultResolution(form.model, 'legacy')}。`
                     : videoV2SpecialPriceModelSelected
                       ? 'video-v2-特价版沿用 video-v2 请求参数，最多支持 9 张参考图、3 个参考视频和 3 个参考音频；请求会按 images、videos、audios 数组提交。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}

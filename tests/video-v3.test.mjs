@@ -80,51 +80,46 @@ test('per-item video-v3 models use the shared adapter with fixed resolutions and
   assert.equal(isVideoV3Fixed480pModel(models[1][0]), true)
 })
 
-test('limits video-v3-特价版 to nine images and disallows video/audio references', () => {
+test('video-v3-特价版 accepts all 30 images, 10 videos and 10 audios using the shared V3 protocols', () => {
   assert.equal(isVideoV3SpecialPriceModel('VIDEO-V3-特价版'), true)
-  assert.deepEqual(getVideoV3MediaLimitsForModel('video-v3-特价版'), { images: 9, videos: 0, audios: 0 })
+  assert.deepEqual(getVideoV3MediaLimitsForModel('video-v3-特价版'), { images: 30, videos: 10, audios: 10 })
 
-  const payload = buildVideoV3SubmitPayload({
+  const images = Array.from({ length: 30 }, (_, index) => `https://cdn.example.com/person-${index}.png`)
+  const videos = Array.from({ length: 10 }, (_, index) => `https://cdn.example.com/camera-${index}.mp4`)
+  const audios = Array.from({ length: 10 }, (_, index) => `https://cdn.example.com/voice-${index}.mp3`)
+  const input = {
     model: 'video-v3-特价版',
-    prompt: '仅使用参考图片。',
-    duration: 10,
+    prompt: '使用全部参考素材。',
+    duration: 30,
     ratio: '16:9',
-    images: Array.from({ length: 9 }, (_, index) => `https://cdn.example.com/person-${index}.png`),
-    videos: [],
-    audios: [],
+    images,
+    videos,
+    audios,
     generateAudio: true,
-  })
-  assert.deepEqual(payload.images, Array.from({ length: 9 }, (_, index) => `https://cdn.example.com/person-${index}.png`))
-  assert.throws(() => buildVideoV3SubmitPayload({
-    model: 'video-v3-特价版',
-    prompt: '超过图片上限。',
-    duration: 10,
-    ratio: '16:9',
-    images: Array.from({ length: 10 }, (_, index) => `https://cdn.example.com/person-${index}.png`),
-    videos: [],
-    audios: [],
-    generateAudio: true,
-  }), /最多支持 9/)
-  assert.throws(() => buildVideoV3SubmitPayload({
-    model: 'video-v3-特价版',
-    prompt: '不支持参考视频。',
-    duration: 10,
-    ratio: '16:9',
-    images: [],
-    videos: ['https://cdn.example.com/camera.mp4'],
-    audios: [],
-    generateAudio: true,
-  }), /不支持参考视频/)
-  assert.throws(() => buildVideoV3SubmitPayload({
-    model: 'video-v3-特价版',
-    prompt: '不支持参考音频。',
-    duration: 10,
-    ratio: '16:9',
-    images: [],
-    videos: [],
-    audios: ['https://cdn.example.com/voice.mp3'],
-    generateAudio: true,
-  }), /不支持参考音频/)
+  }
+
+  const imageOnlyPayload = buildVideoV3SubmitPayload({ ...input, videos: [], audios: [] })
+  assert.deepEqual(imageOnlyPayload.images, images)
+
+  const payload = buildVideoV3SubmitPayload(input)
+  assert.equal(payload.model, input.model)
+  assert.equal(payload.duration, 30)
+  assert.equal(payload.resolution, '720p')
+  assert.deepEqual(payload.content, [
+    { type: 'text', text: input.prompt },
+    ...images.map((url) => ({ type: 'image_url', image_url: { url } })),
+    ...videos.map((url) => ({ type: 'video_url', video_url: { url } })),
+    ...audios.map((url) => ({ type: 'audio_url', audio_url: { url } })),
+  ])
+
+  const qyPayload = buildVideoV3SubmitPayload({ ...input, protocol: 'qy', duration: 10 })
+  assert.deepEqual(qyPayload.images, images)
+  assert.deepEqual(qyPayload.videos, videos)
+  assert.deepEqual(qyPayload.audios, audios)
+
+  assert.throws(() => buildVideoV3SubmitPayload({ ...input, images: [...images, 'https://cdn.example.com/extra.png'] }), /最多支持 30/)
+  assert.throws(() => buildVideoV3SubmitPayload({ ...input, videos: [...videos, 'https://cdn.example.com/extra.mp4'] }), /最多支持 10/)
+  assert.throws(() => buildVideoV3SubmitPayload({ ...input, audios: [...audios, 'https://cdn.example.com/extra.mp3'] }), /最多支持 10/)
 })
 
 test('keeps the original SD2.5 values while validating the QY subset separately', () => {

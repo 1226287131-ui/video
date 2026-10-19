@@ -157,9 +157,7 @@ export function getVideoV3MediaLimits() {
   return VIDEO_V3_MEDIA_LIMITS
 }
 
-export function getVideoV3MediaLimitsForModel(model: unknown): VideoV3MediaCounts {
-  if (isVideoV3SpecialPriceModel(model)) {
-    return { images: 9, videos: 0, audios: 0 }
-  }
+export function getVideoV3MediaLimitsForModel(_model: unknown): VideoV3MediaCounts {
+  // All video-v3 variants, including the special-price model, share these limits.
   return VIDEO_V3_MEDIA_LIMITS
 }
