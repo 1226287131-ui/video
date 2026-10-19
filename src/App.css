@@ -4227,6 +4227,14 @@ body { background: var(--studio-bg); color: var(--studio-text); }
 .history-status.status-queued, .history-status.status-draft { color: #3c67b1; background: #edf3ff; }
 .history-status.status-result_unavailable { color: #9b5b1b; background: #fff4e6; }
 .history-empty { color: var(--studio-muted); }
+.history-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 16px; }
+.history-page-summary { color: var(--studio-muted); font-size: 12px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.history-page-controls { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; max-width: 100%; gap: 8px; }
+.history-page-button { display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0 10px; border: 1px solid var(--studio-border); border-radius: 9px; color: var(--studio-muted); background: var(--studio-surface); font: inherit; font-size: 13px; cursor: pointer; transition: color 150ms, background-color 150ms, border-color 150ms; }
+.history-page-button:hover:not(:disabled) { color: var(--studio-accent); background: #f1f5ff; border-color: #cbd9fb; }
+.history-page-button[aria-current='page'] { color: #fff; background: var(--studio-accent); border-color: var(--studio-accent); font-weight: 600; }
+.history-page-button[aria-current='page']:hover { color: #fff; background: #2857cc; }
+.history-page-button:disabled { opacity: .4; cursor: default; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid rgba(52, 104, 232, .4); outline-offset: 2px; }
 
 @media (max-width: 1199px) {
@@ -4273,6 +4281,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .history-item-preview { flex-basis: 64px; width: 64px; }
   .history-item-select { flex-basis: 24px; }
   .history-result-count { width: 100%; margin-left: 0; }
+  .history-pagination { justify-content: center; }
+  .history-page-summary { flex-basis: 100%; text-align: center; }
   .player-meta > div:last-child { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {

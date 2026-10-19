@@ -36,6 +36,8 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp
 } from 'lucide-react'
 import './App.css'
@@ -296,6 +298,7 @@ const HISTORY_COLLAPSED_STORAGE_KEY = 'video-v1-studio:history-collapsed'
 const UNCERTAIN_SUBMISSIONS_STORAGE_KEY = 'video-v1-studio:uncertain-submissions'
 const API_KEY_STORAGE = 'video-v1-studio:api-key'
 const HISTORY_LIMIT = 20
+const HISTORY_PAGE_SIZE = 5
 const MAX_REFERENCE_IMAGES = 9
 const MAX_GROK_REFERENCE_IMAGES = 7
 const MAX_MINIMAX_IMAGES = MINIMAX_H3_MAX_IMAGES
@@ -759,6 +762,7 @@ function VideoStudioApp() {
   const [draggingPromptFile, setDraggingPromptFile] = useState(false)
   const [importingPromptFile, setImportingPromptFile] = useState(false)
   const [historyQuery, setHistoryQuery] = useState('')
+  const [historyPage, setHistoryPage] = useState(1)
   const [historyCollapsed, setHistoryCollapsed] = useState(false)
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null)
   const [consoleCollapsed, setConsoleCollapsed] = useState(false)
@@ -1114,9 +1118,18 @@ function VideoStudioApp() {
       item.result_url || getVideoContentPath(item.model, item.task_id)
     ),
   )
-  const downloadableFilteredHistory = filteredHistory.filter(isHistoryTaskDownloadable)
-  const selectedDownloadableHistory = downloadableFilteredHistory.filter((item) => selectedHistoryIds.has(item.task_id))
-  const allDownloadableFilteredSelected = downloadableFilteredHistory.length > 0 && selectedDownloadableHistory.length === downloadableFilteredHistory.length
+  const historyPageCount = Math.max(1, Math.ceil(filteredHistory.length / HISTORY_PAGE_SIZE))
+  const currentHistoryPage = Math.min(historyPage, historyPageCount)
+  const historyPageStart = (currentHistoryPage - 1) * HISTORY_PAGE_SIZE
+  const pagedHistory = filteredHistory.slice(historyPageStart, historyPageStart + HISTORY_PAGE_SIZE)
+  const downloadablePageHistory = pagedHistory.filter(isHistoryTaskDownloadable)
+  const selectedDownloadableHistory = orderedHistory.filter((item) => isHistoryTaskDownloadable(item) && selectedHistoryIds.has(item.task_id))
+  const selectedPageCount = downloadablePageHistory.filter((item) => selectedHistoryIds.has(item.task_id)).length
+  const allDownloadablePageSelected = downloadablePageHistory.length > 0 && selectedPageCount === downloadablePageHistory.length
+
+  useEffect(() => {
+    setHistoryPage((current) => Math.min(current, historyPageCount))
+  }, [historyPageCount])
 
   useEffect(() => {
     setSelectedHistoryIds((current) => {
@@ -1644,11 +1657,16 @@ function VideoStudioApp() {
     })
   }
 
-  function toggleAllFilteredHistory() {
+  function updateHistoryQuery(value: string) {
+    setHistoryQuery(value)
+    setHistoryPage(1)
+  }
+
+  function toggleAllPageHistory() {
     setSelectedHistoryIds((current) => {
       const next = new Set(current)
-      if (allDownloadableFilteredSelected) downloadableFilteredHistory.forEach((item) => next.delete(item.task_id))
-      else downloadableFilteredHistory.forEach((item) => next.add(item.task_id))
+      if (allDownloadablePageSelected) downloadablePageHistory.forEach((item) => next.delete(item.task_id))
+      else downloadablePageHistory.forEach((item) => next.add(item.task_id))
       return next
     })
   }
@@ -3963,12 +3981,12 @@ function VideoStudioApp() {
                   <input
                     type="search"
                     value={historyQuery}
-                    onChange={(event) => setHistoryQuery(event.target.value)}
+                    onChange={(event) => updateHistoryQuery(event.target.value)}
                     placeholder="搜索 Prompt、任务 ID 或模型"
                     aria-label="搜索历史视频"
                   />
                   {historyQuery && (
-                    <button type="button" className="history-search-clear" onClick={() => setHistoryQuery('')} aria-label="清除搜索">
+                    <button type="button" className="history-search-clear" onClick={() => updateHistoryQuery('')} aria-label="清除搜索">
                       <X size={15} />
                     </button>
                   )}
@@ -3977,11 +3995,12 @@ function VideoStudioApp() {
                   <label className="history-select-all">
                     <input
                       type="checkbox"
-                      checked={allDownloadableFilteredSelected}
-                      onChange={toggleAllFilteredHistory}
-                      disabled={batchDownloading || downloadableFilteredHistory.length === 0}
+                      ref={(input) => { if (input) input.indeterminate = selectedPageCount > 0 && !allDownloadablePageSelected }}
+                      checked={allDownloadablePageSelected}
+                      onChange={toggleAllPageHistory}
+                      disabled={batchDownloading || downloadablePageHistory.length === 0}
                     />
-                    <span>全选可下载</span>
+                    <span>全选本页可下载</span>
                   </label>
                   <button
                     type="button"
@@ -3999,7 +4018,7 @@ function VideoStudioApp() {
 
               {filteredHistory.length > 0 ? (
                 <div className="history-list">
-                  {filteredHistory.map((item) => {
+                  {pagedHistory.map((item) => {
                     const isCurrent = item.task_id === task?.task_id
                     const itemStatus = String(item.status).toLowerCase()
                     const itemVideoHref = resolveVideoHref(item.result_url)
@@ -4082,6 +4101,47 @@ function VideoStudioApp() {
                 </div>
               ) : (
                 <div className="history-empty">没有匹配的历史视频</div>
+              )}
+              {filteredHistory.length > 0 && (
+                <div className="history-pagination">
+                  <span className="history-page-summary" role="status">
+                    第 {historyPageStart + 1}–{historyPageStart + pagedHistory.length} 条，共 {filteredHistory.length} 条
+                  </span>
+                  {historyPageCount > 1 && (
+                    <nav className="history-page-controls" aria-label="历史视频分页">
+                      <button
+                        type="button"
+                        className="history-page-button"
+                        aria-label="上一页历史视频"
+                        disabled={currentHistoryPage === 1}
+                        onClick={() => setHistoryPage(currentHistoryPage - 1)}
+                      >
+                        <ChevronLeft size={16} aria-hidden="true" />
+                      </button>
+                      {Array.from({ length: historyPageCount }, (_, index) => index + 1).map((page) => (
+                        <button
+                          key={page}
+                          type="button"
+                          className="history-page-button"
+                          aria-label={`历史视频第 ${page} 页`}
+                          aria-current={page === currentHistoryPage ? 'page' : undefined}
+                          onClick={() => setHistoryPage(page)}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="history-page-button"
+                        aria-label="下一页历史视频"
+                        disabled={currentHistoryPage === historyPageCount}
+                        onClick={() => setHistoryPage(currentHistoryPage + 1)}
+                      >
+                        <ChevronRight size={16} aria-hidden="true" />
+                      </button>
+                    </nav>
+                  )}
+                </div>
               )}
             </div>
           </section>
