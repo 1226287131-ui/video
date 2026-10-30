@@ -24,6 +24,7 @@ import {
   getVideoV3MediaLimitsForModel,
   isVideoV3Fixed480pModel,
   isVideoV3Fixed720pModel,
+  isVideoV3Fixed1080pModel,
   isVideoV3SpecialPriceModel,
   isValidVideoV3ResolutionForModel,
   usesVideoV3TopLevelMedia,
@@ -53,6 +54,7 @@ test('per-item video-v3 models use the shared adapter with fixed resolutions and
   const models = [
     ['video-v3-720P（按条计费）', '720p', '480p'],
     ['video-v3-480P（按条计费）', '480p', '720p'],
+    ['video-v3-1080P（按条计费）', '1080p', '720p'],
   ]
   const images = Array.from({ length: 30 }, (_, i) => `https://cdn.example.com/image-${i}.jpg`)
   const videos = Array.from({ length: 10 }, (_, i) => `https://cdn.example.com/video-${i}.mp4`)
@@ -67,17 +69,25 @@ test('per-item video-v3 models use the shared adapter with fixed resolutions and
     const payload = buildVideoV3SubmitPayload(input)
     assert.equal(payload.model, model)
     assert.equal(payload.resolution, resolution)
-    assert.equal(payload.content.length, 51)
-    assert.equal(payload.content.filter((item) => item.type === 'image_url').length, 30)
-    assert.equal(payload.content.filter((item) => item.type === 'video_url').length, 10)
-    assert.equal(payload.content.filter((item) => item.type === 'audio_url').length, 10)
+    assert.equal(payload.images.length, 30)
+    assert.equal(payload.videos.length, 10)
+    assert.equal(payload.audios.length, 10)
+    assert.equal('content' in payload, false)
     assert.throws(() => buildVideoV3SubmitPayload({ ...input, resolution: invalidResolution }), /resolution 固定为/)
+    assert.throws(() => buildVideoV3SubmitPayload({ ...input, resolution: invalidResolution }), new RegExp(`resolution 固定为 ${resolution}`))
+    assert.throws(() => buildVideoV3SubmitPayload({ ...input, duration: 31 }), /duration 必须是/)
     assert.throws(() => buildVideoV3SubmitPayload({ ...input, images: [...images, 'https://cdn.example.com/extra.jpg'] }), /最多支持 30/)
     assert.throws(() => buildVideoV3SubmitPayload({ ...input, videos: [...videos, 'https://cdn.example.com/extra.mp4'] }), /最多支持 10/)
     assert.throws(() => buildVideoV3SubmitPayload({ ...input, audios: [...audios, 'https://cdn.example.com/extra.mp3'] }), /最多支持 10/)
   }
   assert.equal(isVideoV3Fixed720pModel(models[0][0]), true)
   assert.equal(isVideoV3Fixed480pModel(models[1][0]), true)
+  assert.equal(isVideoV3Fixed1080pModel(' VIDEO-V3-1080P（按条计费） '), true)
+  for (const resolution of ['480p', '720p']) {
+    assert.equal(isValidVideoV3ResolutionForModel(resolution, models[2][0], 'legacy'), false)
+  }
+  assert.equal(isValidVideoV3ResolutionForModel('1080p', 'video-v3', 'legacy'), false)
+  assert.equal(isValidVideoV3ResolutionForModel('1080p', models[0][0], 'legacy'), false)
 })
 
 test('video-v3-特价版 accepts all 30 images, 10 videos and 10 audios using the shared V3 protocols', () => {
@@ -105,12 +115,11 @@ test('video-v3-特价版 accepts all 30 images, 10 videos and 10 audios using th
   assert.equal(payload.model, input.model)
   assert.equal(payload.duration, 30)
   assert.equal(payload.resolution, '720p')
-  assert.deepEqual(payload.content, [
-    { type: 'text', text: input.prompt },
-    ...images.map((url) => ({ type: 'image_url', image_url: { url } })),
-    ...videos.map((url) => ({ type: 'video_url', video_url: { url } })),
-    ...audios.map((url) => ({ type: 'audio_url', audio_url: { url } })),
-  ])
+  assert.equal(payload.prompt, input.prompt)
+  assert.deepEqual(payload.images, images)
+  assert.deepEqual(payload.videos, videos)
+  assert.deepEqual(payload.audios, audios)
+  assert.equal('content' in payload, false)
 
   const qyPayload = buildVideoV3SubmitPayload({ ...input, protocol: 'qy', duration: 10 })
   assert.deepEqual(qyPayload.images, images)
@@ -167,9 +176,11 @@ test('uses documented top-level prompt and images for image-only video-v3 reques
   assert.equal(payload.seed, 12345)
   assert.equal(payload.bypass_face_check, false)
   assert.equal(payload.grid_strength, 0.2)
-  for (const unsupportedField of ['seconds', 'aspect_ratio', 'quality', 'async', 'content', 'input_reference', 'videos', 'audios']) {
+  for (const unsupportedField of ['seconds', 'aspect_ratio', 'quality', 'async', 'content', 'input_reference']) {
     assert.equal(unsupportedField in payload, false)
   }
+  assert.deepEqual(payload.videos, [])
+  assert.deepEqual(payload.audios, [])
 })
 
 test('uses the same video-v3 adapter and payload contract for wan-3.0', () => {
@@ -260,13 +271,13 @@ test('uses QY top-level media arrays without changing the original wire contract
   assert.equal(payload.start_frame_url, 'https://cdn.example.com/start.jpg')
   assert.equal(payload.generate_audio, false)
   assert.equal(payload.prompt, '保持人物形象，并使用参考运镜和环境声音。')
-  assert.equal('images' in payload, false)
+  assert.deepEqual(payload.images, [])
   assert.deepEqual(payload.videos, ['https://cdn.example.com/camera.mp4'])
   assert.deepEqual(payload.audios, ['https://cdn.example.com/ambient.mp3'])
   assert.equal('content' in payload, false)
 })
 
-test('keeps the original content[] media wire format, including 30-second requests', () => {
+test('uses top-level media arrays for mixed video-v3 references, including 30-second requests', () => {
   const payload = buildVideoV3SubmitPayload({
     model: 'video-v3',
     prompt: '按照参考视频的运镜生成。',
@@ -282,15 +293,14 @@ test('keeps the original content[] media wire format, including 30-second reques
   assert.equal(payload.duration, 30)
   assert.equal(payload.ratio, '21:9')
   assert.equal(payload.resolution, '720p')
-  assert.deepEqual(payload.content, [
-    { type: 'text', text: '按照参考视频的运镜生成。' },
-    { type: 'image_url', image_url: { url: 'https://cdn.example.com/person.png' } },
-    { type: 'video_url', video_url: { url: 'https://cdn.example.com/camera.mp4' } },
-    { type: 'audio_url', audio_url: { url: 'https://cdn.example.com/ambient.mp3' } },
-  ])
+  assert.equal(payload.prompt, '按照参考视频的运镜生成。')
+  assert.deepEqual(payload.images, ['https://cdn.example.com/person.png'])
+  assert.deepEqual(payload.videos, ['https://cdn.example.com/camera.mp4'])
+  assert.deepEqual(payload.audios, ['https://cdn.example.com/ambient.mp3'])
+  assert.equal('content' in payload, false)
 })
 
-test('omits optional SD2.5 media and passthrough fields when they were not chosen', () => {
+test('keeps empty top-level media arrays for text-only SD2.5 requests', () => {
   const payload = buildVideoV3SubmitPayload({
     model: 'seedance-2.5',
     prompt: '城市夜景缓慢推进镜头',
@@ -302,9 +312,9 @@ test('omits optional SD2.5 media and passthrough fields when they were not chose
     generateAudio: false,
   })
 
-  assert.equal('images' in payload, false)
-  assert.equal('videos' in payload, false)
-  assert.equal('audios' in payload, false)
+  assert.deepEqual(payload.images, [])
+  assert.deepEqual(payload.videos, [])
+  assert.deepEqual(payload.audios, [])
   assert.equal('content' in payload, false)
   assert.equal(payload.resolution, '720p')
   assert.equal('seed' in payload, false)

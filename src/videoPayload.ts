@@ -26,8 +26,8 @@ import {
   getVideoV3DefaultResolution,
   getVideoV3MediaLimitsForModel,
   isVideoV3Fixed480pModel,
+  isVideoV3Fixed1080pModel,
   isVideoV3Model,
-  usesVideoV3TopLevelMedia,
   type VideoV3Protocol,
   type VideoV3Resolution,
   type VideoV3Ratio,
@@ -145,10 +145,7 @@ export type VideoV3ContentItem =
   | { type: 'video_url', video_url: { url: string } }
   | { type: 'audio_url', audio_url: { url: string } }
 
-export type VideoV3SubmitPayload = VideoV3PayloadBase & (
-  | { prompt: string }
-  | { content: VideoV3ContentItem[] }
-)
+export type VideoV3SubmitPayload = VideoV3PayloadBase & { prompt: string }
 
 function normalizeUrls(urls: readonly string[], label: string, limit: number) {
   const normalized = urls.map((url) => {
@@ -243,7 +240,9 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
 
   const resolution = input.resolution ?? getVideoV3DefaultResolution(input.model, protocol)
   if (!isValidVideoV3ResolutionForModel(resolution, input.model, protocol)) {
-    throw new Error(protocol === 'qy'
+    throw new Error(isVideoV3Fixed1080pModel(input.model)
+      ? `${input.model} 的 resolution 固定为 1080p`
+      : protocol === 'qy'
       ? 'QY 协议的 resolution 仅支持 480p 或 720p'
       : isVideoV3Fixed480pModel(input.model)
         ? `${input.model} 的 resolution 固定为 480p`
@@ -306,20 +305,11 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
   if (input.bypassFaceCheck !== undefined) payloadBase.bypass_face_check = input.bypassFaceCheck
   if (input.gridStrength !== undefined && input.gridStrength !== '') payloadBase.grid_strength = input.gridStrength
 
-  if (protocol === 'legacy' && !usesVideoV3TopLevelMedia(input.model) && (videos.length > 0 || audios.length > 0)) {
-    const content: VideoV3ContentItem[] = [
-      { type: 'text', text: input.prompt },
-      ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
-      ...videos.map((url) => ({ type: 'video_url' as const, video_url: { url } })),
-      ...audios.map((url) => ({ type: 'audio_url' as const, audio_url: { url } })),
-    ]
-    return { ...payloadBase, content }
-  }
-
   const payload: VideoV3SubmitPayload = { ...payloadBase, prompt: input.prompt }
-  if (images.length > 0) payload.images = images
-  if (videos.length > 0) payload.videos = videos
-  if (audios.length > 0) payload.audios = audios
+  // Keep reference arrays at the top level for every media combination, as in V2.
+  payload.images = images
+  payload.videos = videos
+  payload.audios = audios
   return payload
 }
 
