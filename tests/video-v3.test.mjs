@@ -10,6 +10,7 @@ import {
 import { buildVideoV3SubmitPayload } from '../src/videoPayload.ts'
 import {
   isValidVideoV3Duration,
+  isValidVideoV3DurationForModel,
   isValidVideoV3GridStrength,
   isValidVideoV3Ratio,
   isValidVideoV3DurationForProtocol,
@@ -21,6 +22,7 @@ import {
   VIDEO_V3_RESOLUTIONS,
   VIDEO_V3_RESOLUTION,
   getVideoV3DefaultResolution,
+  getVideoV3MaxDurationForModel,
   getVideoV3MediaLimitsForModel,
   isVideoV3Fixed480pModel,
   isVideoV3Fixed720pModel,
@@ -66,7 +68,8 @@ test('per-item video-v3 models use the shared adapter with fixed resolutions and
     assert.equal(getVideoSubmitPath(model), '/v1/videos')
     assert.equal(getVideoV3DefaultResolution(model, 'legacy'), resolution)
     assert.deepEqual(getVideoV3MediaLimitsForModel(model), { images: 30, videos: 10, audios: 10 })
-    const input = { model, prompt: '使用全部参考素材', duration: 30, ratio: '16:9', images, videos, audios, generateAudio: true }
+    const duration = model === 'muse' ? 10 : 30
+    const input = { model, prompt: '使用全部参考素材', duration, ratio: '16:9', images, videos, audios, generateAudio: true }
     const payload = buildVideoV3SubmitPayload(input)
     assert.equal(payload.model, model)
     assert.equal(payload.resolution, resolution)
@@ -85,6 +88,14 @@ test('per-item video-v3 models use the shared adapter with fixed resolutions and
   assert.equal(isVideoV3Fixed480pModel(models[1][0]), true)
   assert.equal(isVideoV3Fixed1080pModel(' VIDEO-V3-1080P（按条计费） '), true)
   assert.equal(isVideoV3Fixed720pModel('MUSE'), true)
+  assert.equal(getVideoV3MaxDurationForModel('MUSE'), 10)
+  assert.equal(isValidVideoV3DurationForModel(10, 'MUSE'), true)
+  assert.equal(isValidVideoV3DurationForModel(11, 'muse'), false)
+  assert.equal(isValidVideoV3DurationForModel(30, 'muse'), false)
+  assert.equal(isValidVideoV3DurationForModel(30, 'video-v3'), true)
+  assert.throws(() => buildVideoV3SubmitPayload({
+    model: 'muse', prompt: 'prompt', duration: 11, ratio: '16:9', images: [], videos: [], audios: [], generateAudio: true,
+  }), /muse 的 duration 必须是 4 到 10/)
   for (const resolution of ['480p', '720p']) {
     assert.equal(isValidVideoV3ResolutionForModel(resolution, models[2][0], 'legacy'), false)
   }

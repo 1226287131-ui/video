@@ -101,12 +101,13 @@ import {
   type MiniMaxH3VideoSize,
 } from './minimaxH3'
 import {
-  isValidVideoV3DurationForProtocol,
+  isValidVideoV3DurationForModel,
   VIDEO_V3_MAX_DURATION,
   VIDEO_V3_MIN_DURATION,
   VIDEO_V3_RATIOS,
   getVideoV3DefaultResolution,
   getVideoV3MediaLimitsForModel,
+  getVideoV3MaxDurationForModel,
   type VideoV3Protocol,
 } from './videoV3'
 import {
@@ -1186,7 +1187,7 @@ function VideoStudioApp() {
       setForm((current) => ({
         ...current,
         model: nextModel,
-        duration: isValidVideoV3DurationForProtocol(current.duration, 'legacy') ? current.duration : VIDEO_V3_MIN_DURATION,
+        duration: isValidVideoV3DurationForModel(current.duration, nextModel, 'legacy') ? current.duration : VIDEO_V3_MIN_DURATION,
         ratio: '16:9',
         quality: 'hd',
         resolution: getVideoV3DefaultResolution(nextModel, 'legacy'),
@@ -1201,7 +1202,7 @@ function VideoStudioApp() {
       }))
       setImageInputMode('multiple')
       setImageSourceMode('upload')
-      setMessage(`${nextModel} 使用 video-v3 原协议：4-30 秒、${getVideoV3DefaultResolution(nextModel, 'legacy')}`)
+      setMessage(`${nextModel} 使用 video-v3 原协议：${VIDEO_V3_MIN_DURATION}-${getVideoV3MaxDurationForModel(nextModel, 'legacy')} 秒、${getVideoV3DefaultResolution(nextModel, 'legacy')}`)
       return
     }
 
@@ -2607,8 +2608,8 @@ function VideoStudioApp() {
 
     if (useVideoV3Api) {
       const v3Protocol: VideoV3Protocol = 'legacy'
-      if (!isValidVideoV3DurationForProtocol(formSnapshot.duration, v3Protocol)) {
-        setMessage(`原 video-v3 协议的时长必须是 ${VIDEO_V3_MIN_DURATION} 到 ${VIDEO_V3_MAX_DURATION} 秒之间的整数`)
+      if (!isValidVideoV3DurationForModel(formSnapshot.duration, formSnapshot.model, v3Protocol)) {
+        setMessage(`${formSnapshot.model} 的时长必须是 ${VIDEO_V3_MIN_DURATION} 到 ${getVideoV3MaxDurationForModel(formSnapshot.model, v3Protocol)} 秒之间的整数`)
         setShowSettings(true)
         return
       }
@@ -3271,7 +3272,7 @@ function VideoStudioApp() {
                   {miniMaxModelSelected
                     ? 'MiniMax-H3 会按 images、reference_videos、reference_audios 字段提交；可点击每个素材旁的 @ 按钮，把 @参考图、@参考视频 或 @参考音频写入 Prompt。'
                     : videoV3ModelSelected
-                    ? `${form.model} 使用 video-v3 参数：4-30 秒、${videoV2MediaLimits.images} 图、${videoV2MediaLimits.videos} 视频、${videoV2MediaLimits.audios} 音频，固定 ${getVideoV3DefaultResolution(form.model, 'legacy')}。`
+                    ? `${form.model} 使用 video-v3 参数：${VIDEO_V3_MIN_DURATION}-${getVideoV3MaxDurationForModel(form.model, 'legacy')} 秒、${videoV2MediaLimits.images} 图、${videoV2MediaLimits.videos} 视频、${videoV2MediaLimits.audios} 音频，固定 ${getVideoV3DefaultResolution(form.model, 'legacy')}。`
                     : videoV2SpecialPriceModelSelected
                       ? 'video-v2-特价版沿用 video-v2 请求参数，最多支持 9 张参考图、3 个参考视频和 3 个参考音频；请求会按 images、videos、audios 数组提交。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
@@ -3568,7 +3569,7 @@ function VideoStudioApp() {
                       <input
                         type="number"
                         min={videoV3ModelSelected ? VIDEO_V3_MIN_DURATION : VIDEO_V2_MIN_DURATION}
-                        max={videoV3ModelSelected ? VIDEO_V3_MAX_DURATION : VIDEO_V2_MAX_DURATION}
+                        max={videoV3ModelSelected ? getVideoV3MaxDurationForModel(form.model, 'legacy') : VIDEO_V2_MAX_DURATION}
                         step="1"
                         inputMode="numeric"
                         value={form.duration}
@@ -3578,7 +3579,7 @@ function VideoStudioApp() {
                         }}
                         aria-label={`${form.model} 渲染时长`}
                       />
-                      <span>秒（{videoV3ModelSelected ? VIDEO_V3_MIN_DURATION : VIDEO_V2_MIN_DURATION}-{videoV3ModelSelected ? VIDEO_V3_MAX_DURATION : VIDEO_V2_MAX_DURATION}）</span>
+                      <span>秒（{videoV3ModelSelected ? VIDEO_V3_MIN_DURATION : VIDEO_V2_MIN_DURATION}-{videoV3ModelSelected ? getVideoV3MaxDurationForModel(form.model, 'legacy') : VIDEO_V2_MAX_DURATION}）</span>
                     </label>
                   ) : (
                     <div className="segmented">

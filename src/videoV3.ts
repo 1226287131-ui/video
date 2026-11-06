@@ -49,6 +49,7 @@ export const VIDEO_V3_MEDIA_LIMITS = {
 export const VIDEO_V3_MIN_DURATION = 4
 export const VIDEO_V3_MAX_DURATION = 30
 export const VIDEO_V3_QY_MAX_DURATION = 29
+export const VIDEO_V3_MUSE_MAX_DURATION = 10
 export const VIDEO_V3_RESOLUTIONS = ['480p', '720p'] as const
 export const VIDEO_V3_DEFAULT_RESOLUTION = '720p' as const
 export const VIDEO_V3_QY_DEFAULT_RESOLUTION = '480p' as const
@@ -100,6 +101,15 @@ export function isVideoV3Fixed1080pModel(model: unknown) {
   return (VIDEO_V3_FIXED_1080P_MODELS as readonly string[]).some((candidate) => candidate.toLowerCase() === normalizedModel)
 }
 
+export function isVideoV3MuseModel(model: unknown) {
+  return String(model || '').trim().toLowerCase() === 'muse'
+}
+
+export function getVideoV3MaxDurationForModel(model: unknown, protocol: VideoV3Protocol = 'legacy') {
+  if (isVideoV3MuseModel(model)) return VIDEO_V3_MUSE_MAX_DURATION
+  return protocol === 'qy' ? VIDEO_V3_QY_MAX_DURATION : VIDEO_V3_MAX_DURATION
+}
+
 export function getVideoV3DefaultResolution(model: unknown, protocol: VideoV3Protocol = 'legacy'): VideoV3Resolution {
   if (isVideoV3Fixed1080pModel(model)) return '1080p'
   if (isVideoV3Fixed480pModel(model)) return '480p'
@@ -127,6 +137,16 @@ export function isValidVideoV3DurationForProtocol(value: unknown, protocol: Vide
       ? Number(value.trim())
       : NaN
   const maxDuration = protocol === 'qy' ? VIDEO_V3_QY_MAX_DURATION : VIDEO_V3_MAX_DURATION
+  return Number.isInteger(duration) && duration >= VIDEO_V3_MIN_DURATION && duration <= maxDuration
+}
+
+export function isValidVideoV3DurationForModel(value: unknown, model: unknown, protocol: VideoV3Protocol = 'legacy') {
+  const duration = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value.trim())
+      : NaN
+  const maxDuration = getVideoV3MaxDurationForModel(model, protocol)
   return Number.isInteger(duration) && duration >= VIDEO_V3_MIN_DURATION && duration <= maxDuration
 }
 
