@@ -3,6 +3,7 @@ export const VIDEO_V3_MODELS = [
   'video-v3-480p',
   'video-v3-720P（按条计费）',
   'video-v3-1080P（按条计费）',
+  'muse',
   'video-v3-480P（按条计费）',
   'video-v3-特价版',
   'video-v3（限时低价渠道）',
@@ -20,6 +21,7 @@ export const VIDEO_V3_FIXED_480P_MODELS = [
 
 export const VIDEO_V3_FIXED_720P_MODELS = [
   'video-v3-720P（按条计费）',
+  'muse',
 ] as const
 
 export const VIDEO_V3_FIXED_1080P_MODELS = [

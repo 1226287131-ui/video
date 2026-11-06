@@ -55,6 +55,7 @@ test('per-item video-v3 models use the shared adapter with fixed resolutions and
     ['video-v3-720P（按条计费）', '720p', '480p'],
     ['video-v3-480P（按条计费）', '480p', '720p'],
     ['video-v3-1080P（按条计费）', '1080p', '720p'],
+    ['muse', '720p', '480p'],
   ]
   const images = Array.from({ length: 30 }, (_, i) => `https://cdn.example.com/image-${i}.jpg`)
   const videos = Array.from({ length: 10 }, (_, i) => `https://cdn.example.com/video-${i}.mp4`)
@@ -83,6 +84,7 @@ test('per-item video-v3 models use the shared adapter with fixed resolutions and
   assert.equal(isVideoV3Fixed720pModel(models[0][0]), true)
   assert.equal(isVideoV3Fixed480pModel(models[1][0]), true)
   assert.equal(isVideoV3Fixed1080pModel(' VIDEO-V3-1080P（按条计费） '), true)
+  assert.equal(isVideoV3Fixed720pModel('MUSE'), true)
   for (const resolution of ['480p', '720p']) {
     assert.equal(isValidVideoV3ResolutionForModel(resolution, models[2][0], 'legacy'), false)
   }
