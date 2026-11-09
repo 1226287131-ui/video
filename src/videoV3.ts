@@ -4,6 +4,7 @@ export const VIDEO_V3_MODELS = [
   'video-v3-720P（按条计费）',
   'video-v3-1080P（按条计费）',
   'muse',
+  'muse（按秒计费）',
   'video-v3-480P（按条计费）',
   'video-v3-特价版',
   'video-v3（限时低价渠道）',
@@ -22,6 +23,7 @@ export const VIDEO_V3_FIXED_480P_MODELS = [
 export const VIDEO_V3_FIXED_720P_MODELS = [
   'video-v3-720P（按条计费）',
   'muse',
+  'muse（按秒计费）',
 ] as const
 
 export const VIDEO_V3_FIXED_1080P_MODELS = [
@@ -50,6 +52,7 @@ export const VIDEO_V3_MIN_DURATION = 4
 export const VIDEO_V3_MAX_DURATION = 30
 export const VIDEO_V3_QY_MAX_DURATION = 29
 export const VIDEO_V3_MUSE_MAX_DURATION = 10
+export const VIDEO_V3_MUSE_PER_SECOND_DURATIONS = [10, 20, 30, 40, 50] as const
 export const VIDEO_V3_RESOLUTIONS = ['480p', '720p'] as const
 export const VIDEO_V3_DEFAULT_RESOLUTION = '720p' as const
 export const VIDEO_V3_QY_DEFAULT_RESOLUTION = '480p' as const
@@ -105,7 +108,22 @@ export function isVideoV3MuseModel(model: unknown) {
   return String(model || '').trim().toLowerCase() === 'muse'
 }
 
+export function isVideoV3MusePerSecondModel(model: unknown) {
+  return String(model || '').trim().toLowerCase() === 'muse（按秒计费）'
+}
+
+export function getVideoV3DurationOptionsForModel(model: unknown) {
+  return isVideoV3MusePerSecondModel(model) ? VIDEO_V3_MUSE_PER_SECOND_DURATIONS : undefined
+}
+
+export function getVideoV3DurationConstraintForModel(model: unknown, protocol: VideoV3Protocol = 'legacy') {
+  const options = getVideoV3DurationOptionsForModel(model)
+  if (options) return `${options.join('、')} 秒之一`
+  return `${VIDEO_V3_MIN_DURATION} 到 ${getVideoV3MaxDurationForModel(model, protocol)} 秒之间的整数`
+}
+
 export function getVideoV3MaxDurationForModel(model: unknown, protocol: VideoV3Protocol = 'legacy') {
+  if (isVideoV3MusePerSecondModel(model)) return VIDEO_V3_MUSE_PER_SECOND_DURATIONS.at(-1)!
   if (isVideoV3MuseModel(model)) return VIDEO_V3_MUSE_MAX_DURATION
   return protocol === 'qy' ? VIDEO_V3_QY_MAX_DURATION : VIDEO_V3_MAX_DURATION
 }
@@ -147,6 +165,8 @@ export function isValidVideoV3DurationForModel(value: unknown, model: unknown, p
       ? Number(value.trim())
       : NaN
   const maxDuration = getVideoV3MaxDurationForModel(model, protocol)
+  const options = getVideoV3DurationOptionsForModel(model)
+  if (options && !options.includes(duration as typeof options[number])) return false
   return Number.isInteger(duration) && duration >= VIDEO_V3_MIN_DURATION && duration <= maxDuration
 }
 

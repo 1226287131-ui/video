@@ -108,6 +108,9 @@ import {
   getVideoV3DefaultResolution,
   getVideoV3MediaLimitsForModel,
   getVideoV3MaxDurationForModel,
+  getVideoV3DurationOptionsForModel,
+  getVideoV3DurationConstraintForModel,
+  isVideoV3MusePerSecondModel,
   type VideoV3Protocol,
 } from './videoV3'
 import {
@@ -1047,7 +1050,7 @@ function VideoStudioApp() {
   const selectedTaskUsesProtectedContent = Boolean(task && getVideoContentPath(task.model, task.task_id) && !task.result_url)
   const resultHref = selectedTaskUsesProtectedContent ? grokVideoObjectUrl : resolveVideoHref(task?.result_url)
   const visibleDurationPresets = videoV3ModelSelected
-    ? videoV3DurationPresets
+    ? getVideoV3DurationOptionsForModel(form.model) ?? videoV3DurationPresets
     : grokModelSelected
     ? grokDurationPresets
     : durationPresets
@@ -1187,7 +1190,9 @@ function VideoStudioApp() {
       setForm((current) => ({
         ...current,
         model: nextModel,
-        duration: isValidVideoV3DurationForModel(current.duration, nextModel, 'legacy') ? current.duration : VIDEO_V3_MIN_DURATION,
+        duration: isValidVideoV3DurationForModel(current.duration, nextModel, 'legacy')
+          ? current.duration
+          : getVideoV3DurationOptionsForModel(nextModel)?.[0] ?? VIDEO_V3_MIN_DURATION,
         ratio: '16:9',
         quality: 'hd',
         resolution: getVideoV3DefaultResolution(nextModel, 'legacy'),
@@ -1202,7 +1207,7 @@ function VideoStudioApp() {
       }))
       setImageInputMode('multiple')
       setImageSourceMode('upload')
-      setMessage(`${nextModel} 使用 video-v3 原协议：${VIDEO_V3_MIN_DURATION}-${getVideoV3MaxDurationForModel(nextModel, 'legacy')} 秒、${getVideoV3DefaultResolution(nextModel, 'legacy')}`)
+      setMessage(`${nextModel} 使用 video-v3 原协议：${getVideoV3DurationConstraintForModel(nextModel, 'legacy')}、${getVideoV3DefaultResolution(nextModel, 'legacy')}`)
       return
     }
 
@@ -2609,7 +2614,7 @@ function VideoStudioApp() {
     if (useVideoV3Api) {
       const v3Protocol: VideoV3Protocol = 'legacy'
       if (!isValidVideoV3DurationForModel(formSnapshot.duration, formSnapshot.model, v3Protocol)) {
-        setMessage(`${formSnapshot.model} 的时长必须是 ${VIDEO_V3_MIN_DURATION} 到 ${getVideoV3MaxDurationForModel(formSnapshot.model, v3Protocol)} 秒之间的整数`)
+        setMessage(`${formSnapshot.model} 的时长必须是 ${getVideoV3DurationConstraintForModel(formSnapshot.model, v3Protocol)}`)
         setShowSettings(true)
         return
       }
@@ -3272,7 +3277,7 @@ function VideoStudioApp() {
                   {miniMaxModelSelected
                     ? 'MiniMax-H3 会按 images、reference_videos、reference_audios 字段提交；可点击每个素材旁的 @ 按钮，把 @参考图、@参考视频 或 @参考音频写入 Prompt。'
                     : videoV3ModelSelected
-                    ? `${form.model} 使用 video-v3 参数：${VIDEO_V3_MIN_DURATION}-${getVideoV3MaxDurationForModel(form.model, 'legacy')} 秒、${videoV2MediaLimits.images} 图、${videoV2MediaLimits.videos} 视频、${videoV2MediaLimits.audios} 音频，固定 ${getVideoV3DefaultResolution(form.model, 'legacy')}。`
+                    ? `${form.model} 使用 video-v3 参数：${getVideoV3DurationConstraintForModel(form.model, 'legacy')}、${videoV2MediaLimits.images} 图、${videoV2MediaLimits.videos} 视频、${videoV2MediaLimits.audios} 音频，固定 ${getVideoV3DefaultResolution(form.model, 'legacy')}。`
                     : videoV2SpecialPriceModelSelected
                       ? 'video-v2-特价版沿用 video-v2 请求参数，最多支持 9 张参考图、3 个参考视频和 3 个参考音频；请求会按 images、videos、audios 数组提交。'
                     : 'Prompt 可使用 @Image1、@Video1、@Audio1 指定素材；不填写引用时仍会提交全部已上传素材。'}
@@ -3563,6 +3568,19 @@ function VideoStudioApp() {
                           </button>
                         ))}
                       </div>
+                    </div>
+                  ) : isVideoV3MusePerSecondModel(form.model) ? (
+                    <div className="segmented" role="group" aria-label={`${form.model} 时长`}>
+                      {visibleDurationPresets.map((val) => (
+                        <button
+                          type="button"
+                          key={val}
+                          className={`segmented-item ${form.duration === val ? 'is-active' : ''}`}
+                          onClick={() => updateField('duration', val)}
+                        >
+                          {val}秒
+                        </button>
+                      ))}
                     </div>
                   ) : videoV3ModelSelected || videoV2ModelSelected ? (
                     <label className="video-v3-number-control">

@@ -20,7 +20,7 @@ import {
 } from './minimaxH3.ts'
 import {
   isValidVideoV3DurationForModel,
-  getVideoV3MaxDurationForModel,
+  getVideoV3DurationConstraintForModel,
   isValidVideoV3GridStrengthForProtocol,
   isValidVideoV3RatioForProtocol,
   isValidVideoV3ResolutionForModel,
@@ -230,10 +230,9 @@ export function buildVideoV3SubmitPayload(input: VideoV3SubmitPayloadInput) {
   const protocol = input.protocol ?? 'legacy'
   if (protocol !== 'legacy' && protocol !== 'qy') throw new Error('video-v3 的协议类型无效')
   if (!isValidVideoV3DurationForModel(input.duration, input.model, protocol)) {
-    const maxDuration = getVideoV3MaxDurationForModel(input.model, protocol)
     throw new Error(protocol === 'qy'
       ? 'QY 协议的 duration 必须是 4 到 29 之间的整数'
-      : `${input.model} 的 duration 必须是 4 到 ${maxDuration} 之间的整数`)
+      : `${input.model} 的 duration 必须是 ${getVideoV3DurationConstraintForModel(input.model, protocol)}`)
   }
   if (!isValidVideoV3RatioForProtocol(input.ratio, protocol)) {
     throw new Error(protocol === 'qy' ? 'QY 协议不支持该画幅' : 'video-v3 不支持该画幅')

@@ -23,6 +23,7 @@ import {
   VIDEO_V3_RESOLUTION,
   getVideoV3DefaultResolution,
   getVideoV3MaxDurationForModel,
+  getVideoV3DurationOptionsForModel,
   getVideoV3MediaLimitsForModel,
   isVideoV3Fixed480pModel,
   isVideoV3Fixed720pModel,
@@ -33,7 +34,7 @@ import {
 } from '../src/videoV3.ts'
 
 test('recognizes every documented SD2.5 model alias and routes it through /v1/videos', () => {
-  for (const model of ['video-v3', 'video-v3-480p', 'video-v3-特价版', 'video-v3（限时低价渠道）', 'video-v3（限时低价低价渠道）', 'WAN-3.0', 'Seedance-2.5', 'seedance2.5', 'SD-2.5', ' sd2.5 ']) {
+  for (const model of ['video-v3', 'video-v3-480p', 'video-v3-特价版', 'video-v3（限时低价渠道）', 'video-v3（限时低价低价渠道）', 'muse（按秒计费）', 'WAN-3.0', 'Seedance-2.5', 'seedance2.5', 'SD-2.5', ' sd2.5 ']) {
     assert.equal(isVideoV3Model(model), true)
     assert.equal(getVideoSubmitPath(model), '/v1/videos')
     assert.equal(getVideoTaskPath(model, 'task/a'), '/v1/videos/task%2Fa')
@@ -41,6 +42,35 @@ test('recognizes every documented SD2.5 model alias and routes it through /v1/vi
   }
   assert.equal(isVideoV3Model('video-v3-fast'), false)
   assert.equal(isVideoV3Model('video-v2'), false)
+})
+
+test('muse（按秒计费） reuses the 720p V3 adapter and only accepts 10/20/30/40/50 seconds', () => {
+  const model = 'muse（按秒计费）'
+  assert.equal(getVideoV3DefaultResolution(model, 'legacy'), '720p')
+  assert.equal(isVideoV3Fixed720pModel(model), true)
+  assert.equal(getVideoV3MaxDurationForModel(model), 50)
+  assert.deepEqual(getVideoV3DurationOptionsForModel(model), [10, 20, 30, 40, 50])
+
+  for (const duration of [10, 20, 30, 40, 50]) {
+    assert.equal(isValidVideoV3DurationForModel(duration, model), true)
+    const payload = buildVideoV3SubmitPayload({
+      model, prompt: '按秒计费测试', duration, ratio: '16:9', images: [], videos: [], audios: [], generateAudio: true,
+    })
+    assert.equal(payload.model, model)
+    assert.equal(payload.duration, duration)
+    assert.equal(payload.resolution, '720p')
+  }
+
+  for (const duration of [4, 9, 11, 15, 19, 21, 29, 31, 39, 41, 49, 51]) {
+    assert.equal(isValidVideoV3DurationForModel(duration, model), false)
+    assert.throws(() => buildVideoV3SubmitPayload({
+      model, prompt: '按秒计费测试', duration, ratio: '16:9', images: [], videos: [], audios: [], generateAudio: true,
+    }), /10、20、30、40、50 秒之一/)
+  }
+
+  assert.throws(() => buildVideoV3SubmitPayload({
+    model, prompt: '固定分辨率', duration: 10, ratio: '16:9', resolution: '480p', images: [], videos: [], audios: [], generateAudio: true,
+  }), /resolution 固定为 720p/)
 })
 
 test('keeps video-v3-480p on the shared adapter while enforcing 480p', () => {
