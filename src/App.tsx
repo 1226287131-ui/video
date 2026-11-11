@@ -108,6 +108,7 @@ import {
   getVideoV3DefaultResolution,
   getVideoV3MediaLimitsForModel,
   getVideoV3MaxDurationForModel,
+  getVideoV3MinDurationForModel,
   getVideoV3DurationOptionsForModel,
   getVideoV3DurationConstraintForModel,
   isVideoV3MusePerSecondModel,
@@ -1192,7 +1193,7 @@ function VideoStudioApp() {
         model: nextModel,
         duration: isValidVideoV3DurationForModel(current.duration, nextModel, 'legacy')
           ? current.duration
-          : getVideoV3DurationOptionsForModel(nextModel)?.[0] ?? VIDEO_V3_MIN_DURATION,
+          : getVideoV3DurationOptionsForModel(nextModel)?.[0] ?? getVideoV3MinDurationForModel(nextModel),
         ratio: '16:9',
         quality: 'hd',
         resolution: getVideoV3DefaultResolution(nextModel, 'legacy'),
@@ -3586,7 +3587,7 @@ function VideoStudioApp() {
                     <label className="video-v3-number-control">
                       <input
                         type="number"
-                        min={videoV3ModelSelected ? VIDEO_V3_MIN_DURATION : VIDEO_V2_MIN_DURATION}
+                        min={videoV3ModelSelected ? getVideoV3MinDurationForModel(form.model) : VIDEO_V2_MIN_DURATION}
                         max={videoV3ModelSelected ? getVideoV3MaxDurationForModel(form.model, 'legacy') : VIDEO_V2_MAX_DURATION}
                         step="1"
                         inputMode="numeric"
@@ -3597,7 +3598,7 @@ function VideoStudioApp() {
                         }}
                         aria-label={`${form.model} 渲染时长`}
                       />
-                      <span>秒（{videoV3ModelSelected ? VIDEO_V3_MIN_DURATION : VIDEO_V2_MIN_DURATION}-{videoV3ModelSelected ? getVideoV3MaxDurationForModel(form.model, 'legacy') : VIDEO_V2_MAX_DURATION}）</span>
+                      <span>秒（{videoV3ModelSelected ? getVideoV3MinDurationForModel(form.model) : VIDEO_V2_MIN_DURATION}-{videoV3ModelSelected ? getVideoV3MaxDurationForModel(form.model, 'legacy') : VIDEO_V2_MAX_DURATION}）</span>
                     </label>
                   ) : (
                     <div className="segmented">

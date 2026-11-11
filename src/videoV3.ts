@@ -1,6 +1,7 @@
 export const VIDEO_V3_MODELS = [
   'video-v3',
   'video-v3-480p',
+  'wan-3-480',
   'video-v3-720P（按条计费）',
   'video-v3-1080P（按条计费）',
   'muse',
@@ -17,6 +18,7 @@ export const VIDEO_V3_MODELS = [
 
 export const VIDEO_V3_FIXED_480P_MODELS = [
   'video-v3-480p',
+  'wan-3-480',
   'video-v3-480P（按条计费）',
 ] as const
 
@@ -116,10 +118,14 @@ export function getVideoV3DurationOptionsForModel(model: unknown) {
   return isVideoV3MusePerSecondModel(model) ? VIDEO_V3_MUSE_PER_SECOND_DURATIONS : undefined
 }
 
+export function getVideoV3MinDurationForModel(model: unknown) {
+  return String(model || '').trim().toLowerCase() === 'wan-3-480' ? 5 : VIDEO_V3_MIN_DURATION
+}
+
 export function getVideoV3DurationConstraintForModel(model: unknown, protocol: VideoV3Protocol = 'legacy') {
   const options = getVideoV3DurationOptionsForModel(model)
   if (options) return `${options.join('、')} 秒之一`
-  return `${VIDEO_V3_MIN_DURATION} 到 ${getVideoV3MaxDurationForModel(model, protocol)} 秒之间的整数`
+  return `${getVideoV3MinDurationForModel(model)} 到 ${getVideoV3MaxDurationForModel(model, protocol)} 秒之间的整数`
 }
 
 export function getVideoV3MaxDurationForModel(model: unknown, protocol: VideoV3Protocol = 'legacy') {
@@ -167,7 +173,7 @@ export function isValidVideoV3DurationForModel(value: unknown, model: unknown, p
   const maxDuration = getVideoV3MaxDurationForModel(model, protocol)
   const options = getVideoV3DurationOptionsForModel(model)
   if (options && !options.includes(duration as typeof options[number])) return false
-  return Number.isInteger(duration) && duration >= VIDEO_V3_MIN_DURATION && duration <= maxDuration
+  return Number.isInteger(duration) && duration >= getVideoV3MinDurationForModel(model) && duration <= maxDuration
 }
 
 export function isValidVideoV3Ratio(value: unknown): value is VideoV3Ratio {

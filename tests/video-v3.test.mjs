@@ -82,6 +82,29 @@ test('keeps video-v3-480p on the shared adapter while enforcing 480p', () => {
   assert.equal(isValidVideoV3ResolutionForModel('720p', 'video-v3', 'legacy'), true)
 })
 
+test('wan-3-480 uses the shared V3 protocol with 480p and 5 to 30 second durations', () => {
+  const model = 'wan-3-480'
+  const input = { model, prompt: '测试', duration: 5, ratio: '16:9', images: ['https://example.com/i.png'], videos: ['https://example.com/v.mp4'], audios: ['https://example.com/a.mp3'], generateAudio: true }
+  assert.equal(isVideoV3Model(' WAN-3-480 '), true)
+  assert.equal(getVideoSubmitPath(model), '/v1/videos')
+  assert.equal(getVideoV3DefaultResolution(model, 'legacy'), '480p')
+  assert.deepEqual(getVideoV3MediaLimitsForModel(model), { images: 30, videos: 10, audios: 10 })
+  for (let duration = 5; duration <= 30; duration++) {
+    const payload = buildVideoV3SubmitPayload({ ...input, duration })
+    assert.equal(payload.model, model)
+    assert.equal(payload.duration, duration)
+    assert.equal(payload.resolution, '480p')
+    assert.deepEqual(payload.images, input.images)
+    assert.deepEqual(payload.videos, input.videos)
+    assert.deepEqual(payload.audios, input.audios)
+  }
+  for (const duration of [4, 5.5, 31]) {
+    assert.throws(() => buildVideoV3SubmitPayload({ ...input, duration }), /5 到 30/)
+  }
+  assert.throws(() => buildVideoV3SubmitPayload({ ...input, resolution: '720p' }), /resolution 固定为 480p/)
+  assert.equal(isValidVideoV3DurationForModel(4, 'video-v3'), true)
+})
+
 test('per-item video-v3 models use the shared adapter with fixed resolutions and 30/10/10 media limits', () => {
   const models = [
     ['video-v3-720P（按条计费）', '720p', '480p'],
