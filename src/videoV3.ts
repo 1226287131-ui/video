@@ -1,6 +1,8 @@
 export const VIDEO_V3_MODELS = [
   'video-v3',
   'video-v3-480p',
+  'video-v3-flash-480p',
+  'video-v3-flash-720p',
   'wan-3-480',
   'video-v3-720P（按条计费）',
   'video-v3-1080P（按条计费）',
@@ -18,12 +20,14 @@ export const VIDEO_V3_MODELS = [
 
 export const VIDEO_V3_FIXED_480P_MODELS = [
   'video-v3-480p',
+  'video-v3-flash-480p',
   'wan-3-480',
   'video-v3-480P（按条计费）',
 ] as const
 
 export const VIDEO_V3_FIXED_720P_MODELS = [
   'video-v3-720P（按条计费）',
+  'video-v3-flash-720p',
   'muse',
   'muse（按秒计费）',
 ] as const
